@@ -8,7 +8,8 @@ from uuid import uuid7
 
 from greenlet import greenlet
 
-from runa import Entity
+from runa.entity import Entity
+from runa.service import Service
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -95,6 +96,16 @@ class EntityResponseReceived:
     response: Any
 
 
+@dataclass(kw_only=True, frozen=True)
+class ServiceRequestSent:
+    id: str
+    trace_id: str
+    service_type: type[Service]
+    method_name: str
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+
+
 ExecutionContext = list[
     StateChanged
     | InitializeRequestReceived
@@ -105,6 +116,7 @@ ExecutionContext = list[
     | CreateEntityResponseReceived
     | EntityRequestSent
     | EntityResponseReceived
+    | ServiceRequestSent
 ]
 
 Interception = CreateEntityRequestSent | EntityRequestSent
@@ -271,6 +283,7 @@ def _intercept_interaction(
     with (
         _intercept_create_entity(main_greenlet),
         _intercept_send_entity_request(main_greenlet, subject, trace_id),
+        _intercept_send_service_request(main_greenlet, subject, trace_id),
         # TODO: Protect entity set
     ):
         yield
@@ -344,5 +357,59 @@ def _intercept_send_entity_request(
         setattr(Entity, "__getattribute__", original_getattribute)
 
 
+@contextmanager
+def _intercept_send_service_request(
+    main_greenlet: greenlet,
+    subject: Entity[Any],
+    trace_id: str,
+) -> Generator[None, None, None]:
+    def getattribute(service: Service, name: str) -> Any:
+        original_method = getattr(type(service), name)
+
+        if name.startswith("_"):
+            raise AttributeError("Service state is private")
+
+        if not inspect.isfunction(original_method):
+            raise AttributeError("Service state is private")
+
+        @functools.wraps(original_method)
+        def method(_: Any, /, *args: Any, **kwargs: Any) -> Any:
+            return main_greenlet.switch(
+                ServiceRequestSent(
+                    id=_generate_event_id(),
+                    trace_id=trace_id,
+                    service_type=type(service),
+                    method_name=name,
+                    args=args,
+                    kwargs=kwargs,
+                )
+            )
+
+        return functools.partial(method, service)
+
+    proxies: list[tuple[str, _ServiceProxy]] = []
+    for attr_name, annotation in inspect.get_annotations(type(subject)).items():
+        if issubclass(annotation, Service):
+            proxy = _ServiceProxy()
+            proxy.__class__ = annotation
+            proxies.append((attr_name, proxy))
+
+    for attr_name, service_proxy in proxies:
+        setattr(subject, attr_name, service_proxy)
+
+    original_getattribute = Service.__getattribute__
+    setattr(Service, "__getattribute__", getattribute)
+    try:
+        yield
+    finally:
+        for attr_name, _ in proxies:
+            delattr(subject, attr_name)
+        setattr(Entity, "__getattribute__", original_getattribute)
+
+
 def _generate_event_id() -> str:
     return uuid7().hex
+
+
+class _ServiceProxy:
+    pass

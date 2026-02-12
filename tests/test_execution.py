@@ -1,6 +1,8 @@
+from abc import abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 
-from runa import Entity, Runa
+from runa import Entity, Runa, Service
 from runa.execution import (
     InitializeRequestReceived,
     InitializeResponseSent,
@@ -11,7 +13,18 @@ from runa.execution import (
     CreateEntityResponseReceived,
     EntityRequestSent,
     EntityResponseReceived,
+    ServiceRequestSent,
 )
+
+
+class Species(StrEnum):
+    CAT = "Cat"
+    DOG = "Dog"
+
+
+class PetNameGenerator(Service):
+    @abstractmethod
+    def generate_name(self, species: Species) -> str: ...
 
 
 @dataclass
@@ -21,6 +34,8 @@ class UserState:
 
 
 class User(Entity[UserState]):
+    pet_name_generator: PetNameGenerator
+
     def __init__(self, name: str) -> None:
         self.name = name
         self.pets: list[Pet] = []
@@ -41,6 +56,9 @@ class User(Entity[UserState]):
 
     def rename_pet(self, pet: Pet, new_name: str) -> None:
         pet.change_name(self, new_name)
+
+    def come_up_pet_name(self, species: Species) -> str:
+        return self.pet_name_generator.generate_name(species)
 
 
 @dataclass
@@ -356,5 +374,43 @@ def test_entity_response_received() -> None:
         StateChanged(
             id=result.context[5].id,
             state=UserState("Yuriy", [pet]),
+        ),
+    ]
+
+
+def test_service_request_published() -> None:
+    user = Runa(User)
+    result = user.execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=UserState("Yuriy", []),
+            ),
+            RequestReceived(
+                id="request-1",
+                method_name="come_up_pet_name",
+                args=(Species.CAT,),
+                kwargs={},
+            ),
+        ],
+    )
+    assert result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=UserState("Yuriy", []),
+        ),
+        RequestReceived(
+            id="request-1",
+            method_name="come_up_pet_name",
+            args=(Species.CAT,),
+            kwargs={},
+        ),
+        ServiceRequestSent(
+            id=result.context[2].id,
+            trace_id="request-1",
+            service_type=PetNameGenerator,
+            method_name="generate_name",
+            args=(Species.CAT,),
+            kwargs={},
         ),
     ]
