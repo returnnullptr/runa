@@ -66,7 +66,6 @@ def test_initialize_request_received() -> None:
             ),
         ],
     )
-    assert isinstance(user.entity, User)
     assert user.entity.name == "Yura"
     assert result.context == [
         InitializeRequestReceived(
@@ -95,7 +94,6 @@ def test_state_changed() -> None:
             ),
         ],
     )
-    assert isinstance(user.entity, User)
     assert user.entity.name == "Yura"
     assert result.context == [
         StateChanged(
@@ -121,7 +119,6 @@ def test_request_received() -> None:
             ),
         ],
     )
-    assert isinstance(user.entity, User)
     assert user.entity.name == "Yuriy"
     assert result.context == [
         StateChanged(
@@ -162,7 +159,6 @@ def test_create_entity_request_sent() -> None:
             ),
         ],
     )
-    assert isinstance(user.entity, User)
     assert not user.entity.pets
     assert result.context == [
         StateChanged(
@@ -212,7 +208,6 @@ def test_create_entity_response_received() -> None:
             ),
         ],
     )
-    assert isinstance(user.entity, User)
     assert user.entity.pets == [pet]
     assert result.context == [
         StateChanged(

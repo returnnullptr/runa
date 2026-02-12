@@ -1,7 +1,7 @@
 from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any, Generator, TypeVar, Generic
 from uuid import uuid7
 
 from greenlet import greenlet
@@ -85,8 +85,11 @@ class ExecutionResult:
         self.context = context
 
 
-class Runa:
-    def __init__(self, entity_type: type[Entity[Any]]) -> None:
+EntityT = TypeVar("EntityT", bound=Entity[Any])
+
+
+class Runa(Generic[EntityT]):
+    def __init__(self, entity_type: type[EntityT]) -> None:
         self.entity_type = entity_type
         self.entity = Entity.__new__(self.entity_type)
 
