@@ -2,13 +2,13 @@ from dataclasses import dataclass
 
 from runa import Entity, Runa
 from runa.execution import (
-    InitializeReceived,
-    InitializeHandled,
+    InitializeRequestReceived,
+    InitializeResponseSent,
     StateChanged,
     RequestReceived,
-    RequestHandled,
-    CreateEntityRequested,
-    EntityCreatedReceived,
+    ResponseSent,
+    CreateEntityRequestSent,
+    CreateEntityResponseReceived,
 )
 
 
@@ -55,11 +55,11 @@ class Pet(Entity[PetState]):
         self.name = state.name
 
 
-def test_execute_initialize_received() -> None:
+def test_initialize_request_received() -> None:
     user = Runa(User)
     result = user.execute(
         context=[
-            InitializeReceived(
+            InitializeRequestReceived(
                 id="request-1",
                 args=("Yura",),
                 kwargs={},
@@ -69,12 +69,12 @@ def test_execute_initialize_received() -> None:
     assert isinstance(user.entity, User)
     assert user.entity.name == "Yura"
     assert result.context == [
-        InitializeReceived(
+        InitializeRequestReceived(
             id="request-1",
             args=("Yura",),
             kwargs={},
         ),
-        InitializeHandled(
+        InitializeResponseSent(
             id=result.context[1].id,
             request_id="request-1",
         ),
@@ -85,7 +85,7 @@ def test_execute_initialize_received() -> None:
     ]
 
 
-def test_execute_state_changed() -> None:
+def test_state_changed() -> None:
     user = Runa(User)
     result = user.execute(
         context=[
@@ -105,7 +105,7 @@ def test_execute_state_changed() -> None:
     ]
 
 
-def test_execute_request_received() -> None:
+def test_request_received() -> None:
     user = Runa(User)
     result = user.execute(
         context=[
@@ -134,7 +134,7 @@ def test_execute_request_received() -> None:
             args=("Yuriy",),
             kwargs={},
         ),
-        RequestHandled(
+        ResponseSent(
             id=result.context[2].id,
             request_id="request-1",
             response="Sure!",
@@ -146,7 +146,7 @@ def test_execute_request_received() -> None:
     ]
 
 
-def test_execute_create_entity_requested() -> None:
+def test_create_entity_request_sent() -> None:
     user = Runa(User)
     result = user.execute(
         context=[
@@ -175,7 +175,7 @@ def test_execute_create_entity_requested() -> None:
             args=(),
             kwargs={"name": "Stitch"},
         ),
-        CreateEntityRequested(
+        CreateEntityRequestSent(
             id=result.context[2].id,
             entity_type=Pet,
             args=("Stitch",),
@@ -184,7 +184,7 @@ def test_execute_create_entity_requested() -> None:
     ]
 
 
-def test_execute_entity_created_received() -> None:
+def test_create_entity_response_received() -> None:
     user = Runa(User)
     pet = Pet("Stitch", owner=user.entity)
     result = user.execute(
@@ -199,13 +199,13 @@ def test_execute_entity_created_received() -> None:
                 args=(),
                 kwargs={"name": "Stitch"},
             ),
-            CreateEntityRequested(
+            CreateEntityRequestSent(
                 id="create-entity-1",
                 entity_type=Pet,
                 args=("Stitch",),
                 kwargs={"owner": user.entity},
             ),
-            EntityCreatedReceived(
+            CreateEntityResponseReceived(
                 id="entity-created-1",
                 request_id="create-entity-1",
                 entity=pet,
@@ -225,18 +225,18 @@ def test_execute_entity_created_received() -> None:
             args=(),
             kwargs={"name": "Stitch"},
         ),
-        CreateEntityRequested(
+        CreateEntityRequestSent(
             id="create-entity-1",
             entity_type=Pet,
             args=("Stitch",),
             kwargs={"owner": user.entity},
         ),
-        EntityCreatedReceived(
+        CreateEntityResponseReceived(
             id="entity-created-1",
             request_id="create-entity-1",
             entity=pet,
         ),
-        RequestHandled(
+        ResponseSent(
             id=result.context[4].id,
             request_id="request-1",
             response=None,

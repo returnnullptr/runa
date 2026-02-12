@@ -10,14 +10,14 @@ from runa import Entity
 
 
 @dataclass(kw_only=True, frozen=True)
-class InitializeReceived:
+class InitializeRequestReceived:
     id: str
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
 
 @dataclass(kw_only=True, frozen=True)
-class InitializeHandled:
+class InitializeResponseSent:
     id: str
     request_id: str
 
@@ -37,14 +37,14 @@ class RequestReceived:
 
 
 @dataclass(kw_only=True, frozen=True)
-class RequestHandled:
+class ResponseSent:
     id: str
     request_id: str
     response: Any
 
 
 @dataclass(kw_only=True, frozen=True)
-class CreateEntityRequested:
+class CreateEntityRequestSent:
     id: str
     entity_type: type[Entity[Any]]
     args: tuple[Any, ...]
@@ -60,24 +60,24 @@ class CreateEntityRequested:
 
 
 @dataclass(kw_only=True, frozen=True)
-class EntityCreatedReceived:
+class CreateEntityResponseReceived:
     id: str
     request_id: str
     entity: Entity[Any]
 
 
 ExecutionContext = list[
-    InitializeReceived
-    | InitializeHandled
-    | StateChanged
+    StateChanged
+    | InitializeRequestReceived
+    | InitializeResponseSent
     | RequestReceived
-    | RequestHandled
-    | CreateEntityRequested
-    | EntityCreatedReceived
+    | ResponseSent
+    | CreateEntityRequestSent
+    | CreateEntityResponseReceived
 ]
 
-Interception = CreateEntityRequested
-InitialEvent = InitializeReceived | RequestReceived
+Interception = CreateEntityRequestSent
+Trigger = InitializeRequestReceived | RequestReceived
 
 
 class ExecutionResult:
@@ -94,14 +94,14 @@ class Runa:
         self,
         context: ExecutionContext,
     ) -> ExecutionResult:
-        initial_events: dict[greenlet, InitialEvent] = {}
+        triggers: dict[greenlet, Trigger] = {}
         executions: dict[str, greenlet] = {}
         interceptions = deque[Interception]()
         main_greenlet = greenlet.getcurrent()
         result = ExecutionResult([])
 
         for event in context:
-            if isinstance(event, InitializeReceived):
+            if isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 execution.switch(self.entity, *event.args, **event.kwargs)
 
@@ -111,7 +111,7 @@ class Runa:
                 result.context.append(event)
 
                 result.context.append(
-                    InitializeHandled(
+                    InitializeResponseSent(
                         id=_generate_event_id(),
                         request_id=event.id,
                     )
@@ -138,12 +138,12 @@ class Runa:
                 result.context.append(event)
 
                 if not execution.dead:
-                    initial_events[execution] = event
+                    triggers[execution] = event
                     executions[interception.id] = execution
                     interceptions.append(interception)
                 else:
                     result.context.append(
-                        RequestHandled(
+                        ResponseSent(
                             id=_generate_event_id(),
                             request_id=event.id,
                             response=interception,
@@ -155,7 +155,7 @@ class Runa:
                             state=self.entity.__getstate__(),
                         )
                     )
-            elif isinstance(event, CreateEntityRequested):
+            elif isinstance(event, CreateEntityRequestSent):
                 interception = interceptions.popleft()
                 if not interception.equals_except_id(event):
                     # TODO: Raise custom error
@@ -163,7 +163,7 @@ class Runa:
 
                 executions[event.id] = executions.pop(interception.id)
                 result.context.append(event)
-            elif isinstance(event, EntityCreatedReceived):
+            elif isinstance(event, CreateEntityResponseReceived):
                 result.context.append(event)
 
                 execution = executions.pop(event.request_id)
@@ -174,10 +174,10 @@ class Runa:
                     executions[interception.id] = execution
                     interceptions.append(interception)
                 else:
-                    initial_event = initial_events[execution]
+                    initial_event = triggers[execution]
                     if isinstance(initial_event, RequestReceived):
                         result.context.append(
-                            RequestHandled(
+                            ResponseSent(
                                 id=_generate_event_id(),
                                 request_id=initial_event.id,
                                 response=interception,
@@ -198,7 +198,7 @@ class Runa:
 def _intercept_create_entity(main_greenlet: greenlet) -> Generator[None, None]:
     def new(cls: type[Entity[Any]], *args: Any, **kwargs: Any) -> Entity[Any]:
         entity: Entity[Any] = main_greenlet.switch(
-            CreateEntityRequested(
+            CreateEntityRequestSent(
                 id=_generate_event_id(),
                 entity_type=cls,
                 args=args,
