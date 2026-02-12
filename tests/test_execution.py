@@ -51,3 +51,22 @@ def test_execute_initialize_received() -> None:
             state=UserState("Yura"),
         ),
     ]
+
+
+def test_execute_state_changed() -> None:
+    result = Runa(User).execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=UserState("Yura"),
+            ),
+        ],
+    )
+    assert isinstance(result.entity, User)
+    assert result.entity.name == "Yura"
+    assert result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=UserState("Yura"),
+        ),
+    ]

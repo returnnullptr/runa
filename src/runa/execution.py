@@ -52,25 +52,30 @@ class Runa:
 
         assert len(context) == 1
         event = context[0]
-        assert isinstance(event, InitializeReceived)
-        result.context.append(event)
 
-        execution = greenlet(getattr(self.entity_type, "__init__"))
-        execution.switch(entity, *event.args, *event.kwargs)
+        if isinstance(event, InitializeReceived):
+            execution = greenlet(getattr(self.entity_type, "__init__"))
+            execution.switch(entity, *event.args, *event.kwargs)
 
-        if not execution.dead:
-            raise NotImplementedError
+            if not execution.dead:
+                raise NotImplementedError
 
-        result.context.append(
-            InitializeHandled(
-                id=uuid7().hex,
-                request_id=event.id,
+            result.context.append(event)
+
+            result.context.append(
+                InitializeHandled(
+                    id=uuid7().hex,
+                    request_id=event.id,
+                )
             )
-        )
-        result.context.append(
-            StateChanged(
-                id=uuid7().hex,
-                state=entity.__getstate__(),
+            result.context.append(
+                StateChanged(
+                    id=uuid7().hex,
+                    state=entity.__getstate__(),
+                )
             )
-        )
+        elif isinstance(event, StateChanged):
+            result.context.append(event)
+            entity.__setstate__(event.state)
+
         return result
