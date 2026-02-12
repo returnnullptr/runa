@@ -10,6 +10,7 @@ from runa.execution import (
     CreateEntityRequestSent,
     CreateEntityResponseReceived,
     EntityRequestSent,
+    EntityResponseReceived,
 )
 
 
@@ -289,5 +290,71 @@ def test_entity_request_sent() -> None:
             method_name="change_name",
             args=(user.entity, "Stitch"),
             kwargs={},
+        ),
+    ]
+
+
+def test_entity_response_received() -> None:
+    user = Runa(User)
+    pet = Pet("Stitch", owner=user.entity)
+    result = user.execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=UserState("Yuriy", [pet]),
+            ),
+            RequestReceived(
+                id="request-1",
+                method_name="rename_pet",
+                args=(pet,),
+                kwargs={"new_name": "Stitch"},
+            ),
+            EntityRequestSent(
+                id="request-2",
+                trace_id="request-1",
+                receiver=pet,
+                method_name="change_name",
+                args=(user.entity, "Stitch"),
+                kwargs={},
+            ),
+            EntityResponseReceived(
+                id="response-1",
+                request_id="request-2",
+                response=True,
+            ),
+        ],
+    )
+    assert result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=UserState("Yuriy", [pet]),
+        ),
+        RequestReceived(
+            id="request-1",
+            method_name="rename_pet",
+            args=(pet,),
+            kwargs={"new_name": "Stitch"},
+        ),
+        EntityRequestSent(
+            id="request-2",
+            trace_id="request-1",
+            receiver=pet,
+            method_name="change_name",
+            args=(user.entity, "Stitch"),
+            kwargs={},
+        ),
+        EntityResponseReceived(
+            id="response-1",
+            request_id="request-2",
+            response=True,
+        ),
+        ResponseSent(
+            id=result.context[4].id,
+            request_id="request-1",
+            response=None,
+        ),
+        StateChanged(
+            id=result.context[5].id,
+            state=UserState("Yuriy", [pet]),
         ),
     ]
