@@ -14,6 +14,7 @@ from runa.execution import (
     EntityRequestSent,
     EntityResponseReceived,
     ServiceRequestSent,
+    ServiceResponseReceived,
 )
 
 
@@ -412,5 +413,70 @@ def test_service_request_published() -> None:
             method_name="generate_name",
             args=(Species.CAT,),
             kwargs={},
+        ),
+    ]
+
+
+def test_service_response_received() -> None:
+    user = Runa(User)
+    result = user.execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=UserState("Yuriy", []),
+            ),
+            RequestReceived(
+                id="request-1",
+                method_name="come_up_pet_name",
+                args=(Species.CAT,),
+                kwargs={},
+            ),
+            ServiceRequestSent(
+                id="request-2",
+                trace_id="request-1",
+                service_type=PetNameGenerator,
+                method_name="generate_name",
+                args=(Species.CAT,),
+                kwargs={},
+            ),
+            ServiceResponseReceived(
+                id="response-1",
+                request_id="request-2",
+                response="Stitch",
+            ),
+        ],
+    )
+    assert result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=UserState("Yuriy", []),
+        ),
+        RequestReceived(
+            id="request-1",
+            method_name="come_up_pet_name",
+            args=(Species.CAT,),
+            kwargs={},
+        ),
+        ServiceRequestSent(
+            id="request-2",
+            trace_id="request-1",
+            service_type=PetNameGenerator,
+            method_name="generate_name",
+            args=(Species.CAT,),
+            kwargs={},
+        ),
+        ServiceResponseReceived(
+            id="response-1",
+            request_id="request-2",
+            response="Stitch",
+        ),
+        ResponseSent(
+            id=result.context[4].id,
+            request_id="request-1",
+            response="Stitch",
+        ),
+        StateChanged(
+            id=result.context[5].id,
+            state=UserState("Yuriy", []),
         ),
     ]

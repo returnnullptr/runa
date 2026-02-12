@@ -105,6 +105,23 @@ class ServiceRequestSent:
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
+    def equals_except_id(self, other: Interception) -> bool:
+        return (
+            isinstance(other, type(self))
+            and self.trace_id == other.trace_id
+            and self.service_type is other.service_type
+            and self.method_name is other.method_name
+            and self.args == other.args
+            and self.kwargs == other.kwargs
+        )
+
+
+@dataclass(kw_only=True, frozen=True)
+class ServiceResponseReceived:
+    id: str
+    request_id: str
+    response: Any
+
 
 ExecutionContext = list[
     StateChanged
@@ -117,10 +134,11 @@ ExecutionContext = list[
     | EntityRequestSent
     | EntityResponseReceived
     | ServiceRequestSent
+    | ServiceResponseReceived
 ]
 
-Interception = CreateEntityRequestSent | EntityRequestSent
-TraceRequest = InitializeRequestReceived | RequestReceived
+Interception = CreateEntityRequestSent | EntityRequestSent | ServiceRequestSent
+TraceMessage = InitializeRequestReceived | RequestReceived
 
 
 class ExecutionResult:
@@ -140,7 +158,7 @@ class Runa(Generic[EntityT]):
         self,
         context: ExecutionContext,
     ) -> ExecutionResult:
-        traces: dict[greenlet, TraceRequest] = {}
+        traces: dict[greenlet, TraceMessage] = {}
         executions: dict[str, greenlet] = {}
         interceptions = deque[Interception]()
         main_greenlet = greenlet.getcurrent()
@@ -269,6 +287,40 @@ class Runa(Generic[EntityT]):
                                 state=self.entity.__getstate__(),
                             )
                         )
+            elif isinstance(event, ServiceRequestSent):
+                interception = interceptions.popleft()
+                if not interception.equals_except_id(event):
+                    # TODO: Raise custom error
+                    raise NotImplementedError("Inconsistent execution context")
+
+                executions[event.id] = executions.pop(interception.id)
+                result.context.append(event)
+            elif isinstance(event, ServiceResponseReceived):
+                result.context.append(event)
+
+                execution = executions.pop(event.request_id)
+                with _intercept_interaction(main_greenlet, self.entity, event.id):
+                    interception = execution.switch(event.response)
+
+                if not execution.dead:
+                    executions[interception.id] = execution
+                    interceptions.append(interception)
+                else:
+                    initial_event = traces[execution]
+                    if isinstance(initial_event, RequestReceived):
+                        result.context.append(
+                            ResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                                response=interception,
+                            )
+                        )
+                        result.context.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
 
         result.context.extend(interceptions)
         return result
@@ -284,7 +336,7 @@ def _intercept_interaction(
         _intercept_create_entity(main_greenlet),
         _intercept_send_entity_request(main_greenlet, subject, trace_id),
         _intercept_send_service_request(main_greenlet, subject, trace_id),
-        # TODO: Protect entity set
+        # TODO: Protect entity state
     ):
         yield
 
