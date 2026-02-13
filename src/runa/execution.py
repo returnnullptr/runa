@@ -179,8 +179,6 @@ class Runa[EntityT: Entity]:
     def execute(self, context: ExecutionContext) -> ExecutionResult:
         for event in context:
             # Initial request received
-            # - InitializeRequestReceived
-            # - RequestReceived
             if isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 self.initial_messages[execution] = event
@@ -193,9 +191,6 @@ class Runa[EntityT: Entity]:
                 self._continue(execution, self.entity, *event.args, **event.kwargs)
 
             # Response received
-            # - CreateEntityResponseReceived
-            # - EntityResponseReceived
-            # - ServiceResponseReceived
             elif isinstance(event, CreateEntityResponseReceived):
                 execution = self.executions.pop(event.request_id)
                 self.context.append(event)
@@ -210,9 +205,6 @@ class Runa[EntityT: Entity]:
                 self._continue(execution, event.response)
 
             # Request sent
-            # - CreateEntityRequestSent
-            # - EntityRequestSent
-            # - ServiceRequestSent
             elif isinstance(event, CreateEntityRequestSent):
                 expectation = self.expectations.popleft()
                 if not event.matches(expectation):
@@ -233,8 +225,6 @@ class Runa[EntityT: Entity]:
                 self.context.append(event)
 
             # Response sent
-            # - InitializeResponseSent
-            # - ResponseSent
             elif isinstance(event, InitializeResponseSent):
                 expectation = self.expectations.popleft()
                 if not event.matches(expectation):
