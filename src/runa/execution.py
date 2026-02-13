@@ -134,18 +134,10 @@ class Runa[EntityT: Entity]:
         main_greenlet = greenlet.getcurrent()
 
         for event in context:
-            if isinstance(event, StateChanged):
-                if self.expectations:
-                    expectation = self.expectations.popleft()
-                    if (
-                        not isinstance(expectation, StateChanged)
-                        or event.state != expectation.state
-                    ):
-                        raise NotImplementedError("Inconsistent execution context")
-
-                self.context.append(event)
-                getattr(self.entity, "__setstate__")(event.state)
-            elif isinstance(event, InitializeRequestReceived):
+            # Initial request received
+            # - InitializeRequestReceived
+            # - RequestReceived
+            if isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 execution.switch(self.entity, *event.args, **event.kwargs)
 
@@ -165,15 +157,6 @@ class Runa[EntityT: Entity]:
                         state=self.entity.__getstate__(),
                     )
                 )
-            elif isinstance(event, InitializeResponseSent):
-                expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, InitializeResponseSent)
-                    or event.request_id != expectation.request_id
-                ):
-                    raise NotImplementedError("Inconsistent execution context")
-
-                self.context.append(event)
             elif isinstance(event, RequestReceived):
                 execution = greenlet(getattr(self.entity_type, event.method_name))
 
@@ -204,28 +187,11 @@ class Runa[EntityT: Entity]:
                             state=self.entity.__getstate__(),
                         )
                     )
-            elif isinstance(event, ResponseSent):
-                expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, ResponseSent)
-                    or event.request_id != expectation.request_id
-                    or event.response != expectation.response
-                ):
-                    raise NotImplementedError("Inconsistent execution context")
 
-                self.context.append(event)
-            elif isinstance(event, CreateEntityRequestSent):
-                expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, CreateEntityRequestSent)
-                    or event.entity_type != expectation.entity_type
-                    or event.args != expectation.args
-                    or event.kwargs != expectation.kwargs
-                ):
-                    raise NotImplementedError("Inconsistent execution context")
-
-                self.executions[event.id] = self.executions.pop(expectation.id)
-                self.context.append(event)
+            # Response received
+            # - CreateEntityResponseReceived
+            # - EntityResponseReceived
+            # - ServiceResponseReceived
             elif isinstance(event, CreateEntityResponseReceived):
                 self.context.append(event)
 
@@ -253,20 +219,6 @@ class Runa[EntityT: Entity]:
                                 state=self.entity.__getstate__(),
                             )
                         )
-            elif isinstance(event, EntityRequestSent):
-                expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, EntityRequestSent)
-                    or event.trace_id != expectation.trace_id
-                    or event.receiver is not expectation.receiver
-                    or event.method_name is not expectation.method_name
-                    or event.args != expectation.args
-                    or event.kwargs != expectation.kwargs
-                ):
-                    raise NotImplementedError("Inconsistent execution context")
-
-                self.executions[event.id] = self.executions.pop(expectation.id)
-                self.context.append(event)
             elif isinstance(event, EntityResponseReceived):
                 self.context.append(event)
 
@@ -293,20 +245,6 @@ class Runa[EntityT: Entity]:
                                 state=self.entity.__getstate__(),
                             )
                         )
-            elif isinstance(event, ServiceRequestSent):
-                expectation = self.expectations.popleft()
-                if not (
-                    isinstance(expectation, ServiceRequestSent)
-                    and event.trace_id == expectation.trace_id
-                    and event.service_type is expectation.service_type
-                    and event.method_name is expectation.method_name
-                    and event.args == expectation.args
-                    and event.kwargs == expectation.kwargs
-                ):
-                    raise NotImplementedError("Inconsistent execution context")
-
-                self.executions[event.id] = self.executions.pop(expectation.id)
-                self.context.append(event)
             elif isinstance(event, ServiceResponseReceived):
                 self.context.append(event)
 
@@ -333,6 +271,88 @@ class Runa[EntityT: Entity]:
                                 state=self.entity.__getstate__(),
                             )
                         )
+
+            # Request sent
+            # - CreateEntityRequestSent
+            # - EntityRequestSent
+            # - ServiceRequestSent
+            elif isinstance(event, CreateEntityRequestSent):
+                expectation = self.expectations.popleft()
+                if (
+                    not isinstance(expectation, CreateEntityRequestSent)
+                    or event.entity_type != expectation.entity_type
+                    or event.args != expectation.args
+                    or event.kwargs != expectation.kwargs
+                ):
+                    raise NotImplementedError("Inconsistent execution context")
+
+                self.executions[event.id] = self.executions.pop(expectation.id)
+                self.context.append(event)
+            elif isinstance(event, EntityRequestSent):
+                expectation = self.expectations.popleft()
+                if (
+                    not isinstance(expectation, EntityRequestSent)
+                    or event.trace_id != expectation.trace_id
+                    or event.receiver is not expectation.receiver
+                    or event.method_name is not expectation.method_name
+                    or event.args != expectation.args
+                    or event.kwargs != expectation.kwargs
+                ):
+                    raise NotImplementedError("Inconsistent execution context")
+
+                self.executions[event.id] = self.executions.pop(expectation.id)
+                self.context.append(event)
+            elif isinstance(event, ServiceRequestSent):
+                expectation = self.expectations.popleft()
+                if not (
+                    isinstance(expectation, ServiceRequestSent)
+                    and event.trace_id == expectation.trace_id
+                    and event.service_type is expectation.service_type
+                    and event.method_name is expectation.method_name
+                    and event.args == expectation.args
+                    and event.kwargs == expectation.kwargs
+                ):
+                    raise NotImplementedError("Inconsistent execution context")
+
+                self.executions[event.id] = self.executions.pop(expectation.id)
+                self.context.append(event)
+
+            # Response sent
+            # - InitializeResponseSent
+            # - ResponseSent
+            elif isinstance(event, InitializeResponseSent):
+                expectation = self.expectations.popleft()
+                if (
+                    not isinstance(expectation, InitializeResponseSent)
+                    or event.request_id != expectation.request_id
+                ):
+                    raise NotImplementedError("Inconsistent execution context")
+
+                self.context.append(event)
+            elif isinstance(event, ResponseSent):
+                expectation = self.expectations.popleft()
+                if (
+                    not isinstance(expectation, ResponseSent)
+                    or event.request_id != expectation.request_id
+                    or event.response != expectation.response
+                ):
+                    raise NotImplementedError("Inconsistent execution context")
+
+                self.context.append(event)
+
+            # State changed
+            elif isinstance(event, StateChanged):
+                if self.expectations:
+                    expectation = self.expectations.popleft()
+                    if (
+                        not isinstance(expectation, StateChanged)
+                        or event.state != expectation.state
+                    ):
+                        raise NotImplementedError("Inconsistent execution context")
+
+                self.context.append(event)
+                getattr(self.entity, "__setstate__")(event.state)
+
             else:
                 assert_never(event)
 
