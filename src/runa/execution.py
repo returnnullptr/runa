@@ -214,7 +214,20 @@ class Runa[EntityT: Entity]:
                     self.expectations.append(interception)
                 else:
                     initial_event = self.initial_messages[execution]
-                    if isinstance(initial_event, RequestReceived):
+                    if isinstance(initial_event, InitializeRequestReceived):
+                        self.expectations.append(
+                            InitializeResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                            )
+                        )
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
+                    elif isinstance(initial_event, RequestReceived):
                         self.expectations.append(
                             ResponseSent(
                                 id=_generate_event_id(),
@@ -240,7 +253,20 @@ class Runa[EntityT: Entity]:
                     self.expectations.append(interception)
                 else:
                     initial_event = self.initial_messages[execution]
-                    if isinstance(initial_event, RequestReceived):
+                    if isinstance(initial_event, InitializeRequestReceived):
+                        self.expectations.append(
+                            InitializeResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                            )
+                        )
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
+                    elif isinstance(initial_event, RequestReceived):
                         self.expectations.append(
                             ResponseSent(
                                 id=_generate_event_id(),
@@ -266,7 +292,20 @@ class Runa[EntityT: Entity]:
                     self.expectations.append(interception)
                 else:
                     initial_event = self.initial_messages[execution]
-                    if isinstance(initial_event, RequestReceived):
+                    if isinstance(initial_event, InitializeRequestReceived):
+                        self.expectations.append(
+                            InitializeResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                            )
+                        )
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
+                    elif isinstance(initial_event, RequestReceived):
                         self.expectations.append(
                             ResponseSent(
                                 id=_generate_event_id(),

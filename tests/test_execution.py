@@ -607,3 +607,54 @@ def test_initialize_request_received_create_entity_request_sent() -> None:
             kwargs={},
         ),
     ]
+
+
+def test_create_entity_response_received_initialize_response_sent() -> None:
+    project = Runa(Project)
+    readme = Readme("Research project")
+    result = project.execute(
+        context=[
+            InitializeRequestReceived(
+                id="request-1",
+                args=("Research project",),
+                kwargs={},
+            ),
+            CreateEntityRequestSent(
+                id="request-2",
+                entity_type=Readme,
+                args=("Research project",),
+                kwargs={},
+            ),
+            CreateEntityResponseReceived(
+                id="response-1",
+                request_id="request-2",
+                entity=readme,
+            ),
+        ]
+    )
+    assert result.context == [
+        InitializeRequestReceived(
+            id="request-1",
+            args=("Research project",),
+            kwargs={},
+        ),
+        CreateEntityRequestSent(
+            id="request-2",
+            entity_type=Readme,
+            args=("Research project",),
+            kwargs={},
+        ),
+        CreateEntityResponseReceived(
+            id="response-1",
+            request_id="request-2",
+            entity=readme,
+        ),
+        InitializeResponseSent(
+            id=result.context[3].id,
+            request_id="request-1",
+        ),
+        StateChanged(
+            id=result.context[4].id,
+            state=ProjectState(readme),
+        ),
+    ]
