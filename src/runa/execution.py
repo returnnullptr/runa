@@ -3,7 +3,7 @@ import inspect
 from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator, TypeVar, Generic, assert_never
+from typing import Any, Generator, assert_never
 from uuid import uuid7
 
 from greenlet import greenlet
@@ -49,7 +49,7 @@ class ResponseSent:
 @dataclass(kw_only=True, frozen=True)
 class CreateEntityRequestSent:
     id: str
-    entity_type: type[Entity[Any]]
+    entity_type: type[Entity]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
@@ -58,14 +58,14 @@ class CreateEntityRequestSent:
 class CreateEntityResponseReceived:
     id: str
     request_id: str
-    entity: Entity[Any]
+    entity: Entity
 
 
 @dataclass(kw_only=True, frozen=True)
 class EntityRequestSent:
     id: str
     trace_id: str
-    receiver: Entity[Any]
+    receiver: Entity
     method_name: str
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
@@ -119,10 +119,7 @@ class ExecutionResult:
         self.context = context
 
 
-EntityT = TypeVar("EntityT", bound=Entity[Any])
-
-
-class Runa(Generic[EntityT]):
+class Runa[EntityT: Entity]:
     def __init__(self, entity_type: type[EntityT]) -> None:
         self.entity_type = entity_type
         self.entity = Entity.__new__(self.entity_type)
@@ -150,7 +147,7 @@ class Runa(Generic[EntityT]):
                         raise NotImplementedError("Inconsistent execution context")
 
                 result.context.append(event)
-                self.entity.__setstate__(event.state)
+                getattr(self.entity, "__setstate__")(event.state)
             elif isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 execution.switch(self.entity, *event.args, **event.kwargs)
@@ -348,7 +345,7 @@ class Runa(Generic[EntityT]):
 @contextmanager
 def _intercept_interaction(
     main_greenlet: greenlet,
-    subject: Entity[Any],
+    subject: Entity,
     trace_id: str,
 ) -> Generator[None, None, None]:
     with (
@@ -362,8 +359,8 @@ def _intercept_interaction(
 
 @contextmanager
 def _intercept_create_entity(main_greenlet: greenlet) -> Generator[None, None, None]:
-    def new(cls: type[Entity[Any]], *args: Any, **kwargs: Any) -> Entity[Any]:
-        entity: Entity[Any] = main_greenlet.switch(
+    def new(cls: type[Entity], *args: Any, **kwargs: Any) -> Entity:
+        entity: Entity = main_greenlet.switch(
             CreateEntityRequestSent(
                 id=_generate_event_id(),
                 entity_type=cls,
@@ -391,10 +388,10 @@ def _intercept_create_entity(main_greenlet: greenlet) -> Generator[None, None, N
 @contextmanager
 def _intercept_send_entity_request(
     main_greenlet: greenlet,
-    subject: Entity[Any],
+    subject: Entity,
     trace_id: str,
 ) -> Generator[None, None, None]:
-    def getattribute(entity: Entity[Any], name: str) -> Any:
+    def getattribute(entity: Entity, name: str) -> Any:
         if entity is subject:
             return original_getattribute(entity, name)
 
@@ -431,7 +428,7 @@ def _intercept_send_entity_request(
 @contextmanager
 def _intercept_send_service_request(
     main_greenlet: greenlet,
-    subject: Entity[Any],
+    subject: Entity,
     trace_id: str,
 ) -> Generator[None, None, None]:
     def getattribute(service: Service, name: str) -> Any:

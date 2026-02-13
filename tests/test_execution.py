@@ -34,7 +34,7 @@ class UserState:
     pets: list[Pet]
 
 
-class User(Entity[UserState]):
+class User(Entity):
     pet_name_generator: PetNameGenerator
 
     def __init__(self, name: str) -> None:
@@ -67,7 +67,7 @@ class PetState:
     name: str
 
 
-class Pet(Entity[PetState]):
+class Pet(Entity):
     def __init__(self, name: str, owner: User) -> None:
         self.name = name
         self.owner = owner
