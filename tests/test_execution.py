@@ -88,17 +88,37 @@ class Pet(Entity):
 @dataclass
 class ProjectState:
     readme: Readme
+    tests: str | None
+    code: str | None
+
+
+class CodeGenerator(Service):
+    @abstractmethod
+    def generate_tests(self) -> str: ...
+
+    @abstractmethod
+    def generate_code(self, tests: str) -> str: ...
 
 
 class Project(Entity):
+    code_generator: CodeGenerator
+
     def __init__(self, description: str) -> None:
         self.readme = Readme(description)
+        self.tests: str | None = None
+        self.code: str | None = None
 
     def __getstate__(self) -> ProjectState:
-        return ProjectState(self.readme)
+        return ProjectState(self.readme, self.tests, self.code)
 
     def __setstate__(self, state: ProjectState) -> None:
         self.readme = state.readme
+        self.tests = state.tests
+        self.code = state.code
+
+    def write_tests_and_code(self) -> None:
+        tests = self.code_generator.generate_tests()
+        self.code_generator.generate_code(tests)
 
 
 class Readme(Entity):
@@ -655,6 +675,71 @@ def test_create_entity_response_received_initialize_response_sent() -> None:
         ),
         StateChanged(
             id=result.context[4].id,
-            state=ProjectState(readme),
+            state=ProjectState(readme, None, None),
+        ),
+    ]
+
+
+def test_request_sequence() -> None:
+    project = Runa(Project)
+    readme = Readme("Research project")
+    result = project.execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=ProjectState(readme, None, None),
+            ),
+            RequestReceived(
+                id="request-1",
+                method_name="write_tests_and_code",
+                args=(),
+                kwargs={},
+            ),
+            ServiceRequestSent(
+                id="request-2",
+                trace_id="request-1",
+                service_type=CodeGenerator,
+                method_name="generate_tests",
+                args=(),
+                kwargs={},
+            ),
+            ServiceResponseReceived(
+                id="response-1",
+                request_id="request-2",
+                response="def test_nothing() -> None: assert True",
+            ),
+        ]
+    )
+    assert result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=ProjectState(readme, None, None),
+        ),
+        RequestReceived(
+            id="request-1",
+            method_name="write_tests_and_code",
+            args=(),
+            kwargs={},
+        ),
+        ServiceRequestSent(
+            id="request-2",
+            trace_id="request-1",
+            service_type=CodeGenerator,
+            method_name="generate_tests",
+            args=(),
+            kwargs={},
+        ),
+        ServiceResponseReceived(
+            id="response-1",
+            request_id="request-2",
+            response="def test_nothing() -> None: assert True",
+        ),
+        ServiceRequestSent(
+            id=result.context[4].id,
+            trace_id="request-1",
+            service_type=CodeGenerator,
+            method_name="generate_code",
+            args=("def test_nothing() -> None: assert True",),
+            kwargs={},
         ),
     ]
