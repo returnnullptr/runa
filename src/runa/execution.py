@@ -131,89 +131,120 @@ class Runa[EntityT: Entity]:
         self.context: ExecutionContext = []
 
     def execute(self, context: ExecutionContext) -> ExecutionResult:
-        main_greenlet = greenlet.getcurrent()
-
         for event in context:
             # Initial request received
             # - InitializeRequestReceived
             # - RequestReceived
             if isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
-
-                with _intercept_interaction(main_greenlet, self.entity, event.id):
-                    interception = execution.switch(
-                        self.entity,
-                        *event.args,
-                        **event.kwargs,
-                    )
-
+                self.initial_messages[execution] = event
                 self.context.append(event)
 
+                trace_id = event.id
+                args = (self.entity, *event.args)
+                kwargs = event.kwargs
+
+                with _intercept_interaction(self.entity, trace_id):
+                    interception = execution.switch(*args, **kwargs)
+
                 if not execution.dead:
-                    self.initial_messages[execution] = event
                     self.executions[interception.id] = execution
                     self.expectations.append(interception)
                 else:
-                    self.expectations.append(
-                        InitializeResponseSent(
-                            id=_generate_event_id(),
-                            request_id=event.id,
+                    initial_event = self.initial_messages.pop(execution)
+                    if isinstance(initial_event, InitializeRequestReceived):
+                        self.expectations.append(
+                            InitializeResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                            )
                         )
-                    )
-                    self.expectations.append(
-                        StateChanged(
-                            id=_generate_event_id(),
-                            state=self.entity.__getstate__(),
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
                         )
-                    )
+                    elif isinstance(initial_event, RequestReceived):
+                        self.expectations.append(
+                            ResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                                response=interception,
+                            )
+                        )
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
+
             elif isinstance(event, RequestReceived):
                 execution = greenlet(getattr(self.entity_type, event.method_name))
-
-                with _intercept_interaction(main_greenlet, self.entity, event.id):
-                    interception = execution.switch(
-                        self.entity,
-                        *event.args,
-                        **event.kwargs,
-                    )
-
+                self.initial_messages[execution] = event
                 self.context.append(event)
 
+                trace_id = event.id
+                args = (self.entity, *event.args)
+                kwargs = event.kwargs
+
+                with _intercept_interaction(self.entity, trace_id):
+                    interception = execution.switch(*args, **kwargs)
+
                 if not execution.dead:
-                    self.initial_messages[execution] = event
                     self.executions[interception.id] = execution
                     self.expectations.append(interception)
                 else:
-                    self.expectations.append(
-                        ResponseSent(
-                            id=_generate_event_id(),
-                            request_id=event.id,
-                            response=interception,
+                    initial_event = self.initial_messages.pop(execution)
+                    if isinstance(initial_event, InitializeRequestReceived):
+                        self.expectations.append(
+                            InitializeResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                            )
                         )
-                    )
-                    self.expectations.append(
-                        StateChanged(
-                            id=_generate_event_id(),
-                            state=self.entity.__getstate__(),
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
                         )
-                    )
+                    elif isinstance(initial_event, RequestReceived):
+                        self.expectations.append(
+                            ResponseSent(
+                                id=_generate_event_id(),
+                                request_id=initial_event.id,
+                                response=interception,
+                            )
+                        )
+                        self.expectations.append(
+                            StateChanged(
+                                id=_generate_event_id(),
+                                state=self.entity.__getstate__(),
+                            )
+                        )
 
             # Response received
             # - CreateEntityResponseReceived
             # - EntityResponseReceived
             # - ServiceResponseReceived
             elif isinstance(event, CreateEntityResponseReceived):
+                execution = self.executions.pop(event.request_id)
                 self.context.append(event)
 
-                execution = self.executions.pop(event.request_id)
+                trace_id = event.id
+                args = (event.entity,)
+                kwargs = {}
 
-                with _intercept_interaction(main_greenlet, self.entity, event.id):
-                    interception = execution.switch(event.entity)
+                with _intercept_interaction(self.entity, trace_id):
+                    interception = execution.switch(*args, **kwargs)
 
                 if not execution.dead:
                     self.executions[interception.id] = execution
                     self.expectations.append(interception)
                 else:
-                    initial_event = self.initial_messages[execution]
+                    initial_event = self.initial_messages.pop(execution)
                     if isinstance(initial_event, InitializeRequestReceived):
                         self.expectations.append(
                             InitializeResponseSent(
@@ -242,17 +273,21 @@ class Runa[EntityT: Entity]:
                             )
                         )
             elif isinstance(event, EntityResponseReceived):
+                execution = self.executions.pop(event.request_id)
                 self.context.append(event)
 
-                execution = self.executions.pop(event.request_id)
-                with _intercept_interaction(main_greenlet, self.entity, event.id):
-                    interception = execution.switch(event.response)
+                trace_id = event.id
+                args = (event.response,)
+                kwargs = {}
+
+                with _intercept_interaction(self.entity, trace_id):
+                    interception = execution.switch(*args, **kwargs)
 
                 if not execution.dead:
                     self.executions[interception.id] = execution
                     self.expectations.append(interception)
                 else:
-                    initial_event = self.initial_messages[execution]
+                    initial_event = self.initial_messages.pop(execution)
                     if isinstance(initial_event, InitializeRequestReceived):
                         self.expectations.append(
                             InitializeResponseSent(
@@ -281,17 +316,21 @@ class Runa[EntityT: Entity]:
                             )
                         )
             elif isinstance(event, ServiceResponseReceived):
+                execution = self.executions.pop(event.request_id)
                 self.context.append(event)
 
-                execution = self.executions.pop(event.request_id)
-                with _intercept_interaction(main_greenlet, self.entity, event.id):
-                    interception = execution.switch(event.response)
+                trace_id = event.id
+                args = (event.response,)
+                kwargs = {}
+
+                with _intercept_interaction(self.entity, trace_id):
+                    interception = execution.switch(*args, **kwargs)
 
                 if not execution.dead:
                     self.executions[interception.id] = execution
                     self.expectations.append(interception)
                 else:
-                    initial_event = self.initial_messages[execution]
+                    initial_event = self.initial_messages.pop(execution)
                     if isinstance(initial_event, InitializeRequestReceived):
                         self.expectations.append(
                             InitializeResponseSent(
@@ -410,10 +449,10 @@ class Runa[EntityT: Entity]:
 
 @contextmanager
 def _intercept_interaction(
-    main_greenlet: greenlet,
     subject: Entity,
     trace_id: str,
 ) -> Generator[None, None, None]:
+    main_greenlet = greenlet.getcurrent()
     with (
         _intercept_create_entity(main_greenlet),
         _intercept_send_entity_request(main_greenlet, subject, trace_id),
