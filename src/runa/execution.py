@@ -24,11 +24,23 @@ class InitializeResponseSent:
     id: str
     request_id: str
 
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, InitializeResponseSent)
+            and self.request_id == expectation.request_id
+        )
+
 
 @dataclass(kw_only=True, frozen=True)
 class StateChanged:
     id: str
     state: Any
+
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, StateChanged)  #
+            and self.state == expectation.state
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -45,6 +57,13 @@ class ResponseSent:
     request_id: str
     response: Any
 
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, ResponseSent)
+            and self.request_id == expectation.request_id
+            and self.response == expectation.response
+        )
+
 
 @dataclass(kw_only=True, frozen=True)
 class CreateEntityRequestSent:
@@ -52,6 +71,14 @@ class CreateEntityRequestSent:
     entity_type: type[Entity]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
+
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, CreateEntityRequestSent)
+            and self.entity_type is expectation.entity_type
+            and self.args == expectation.args
+            and self.kwargs == expectation.kwargs
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -70,6 +97,16 @@ class EntityRequestSent:
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, EntityRequestSent)
+            and self.trace_id == expectation.trace_id
+            and self.receiver is expectation.receiver
+            and self.method_name is expectation.method_name
+            and self.args == expectation.args
+            and self.kwargs == expectation.kwargs
+        )
+
 
 @dataclass(kw_only=True, frozen=True)
 class EntityResponseReceived:
@@ -86,6 +123,16 @@ class ServiceRequestSent:
     method_name: str
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
+
+    def matches(self, expectation: object) -> bool:
+        return (
+            isinstance(expectation, ServiceRequestSent)
+            and self.trace_id == expectation.trace_id
+            and self.service_type is expectation.service_type
+            and self.method_name == expectation.method_name
+            and self.args == expectation.args
+            and self.kwargs == expectation.kwargs
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -112,6 +159,7 @@ ExecutionContext = list[
 ExecutionInitialMessage = InitializeRequestReceived | RequestReceived
 InterceptionMessage = CreateEntityRequestSent | EntityRequestSent | ServiceRequestSent
 ExecutionFinalMessage = InitializeResponseSent | ResponseSent
+Expectation = StateChanged | InterceptionMessage | ExecutionFinalMessage
 
 
 class ExecutionResult:
@@ -125,9 +173,7 @@ class Runa[EntityT: Entity]:
         self.entity = Entity.__new__(self.entity_type)
         self.executions: dict[str, greenlet] = {}
         self.initial_messages: dict[greenlet, ExecutionInitialMessage] = {}
-        self.expectations = deque[
-            StateChanged | InterceptionMessage | ExecutionFinalMessage
-        ]()
+        self.expectations = deque[Expectation]()
         self.context: ExecutionContext = []
 
     def execute(self, context: ExecutionContext) -> ExecutionResult:
@@ -169,42 +215,20 @@ class Runa[EntityT: Entity]:
             # - ServiceRequestSent
             elif isinstance(event, CreateEntityRequestSent):
                 expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, CreateEntityRequestSent)
-                    or event.entity_type != expectation.entity_type
-                    or event.args != expectation.args
-                    or event.kwargs != expectation.kwargs
-                ):
+                if not event.matches(expectation):
                     raise NotImplementedError("Inconsistent execution context")
-
                 self.executions[event.id] = self.executions.pop(expectation.id)
                 self.context.append(event)
             elif isinstance(event, EntityRequestSent):
                 expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, EntityRequestSent)
-                    or event.trace_id != expectation.trace_id
-                    or event.receiver is not expectation.receiver
-                    or event.method_name is not expectation.method_name
-                    or event.args != expectation.args
-                    or event.kwargs != expectation.kwargs
-                ):
+                if not event.matches(expectation):
                     raise NotImplementedError("Inconsistent execution context")
-
                 self.executions[event.id] = self.executions.pop(expectation.id)
                 self.context.append(event)
             elif isinstance(event, ServiceRequestSent):
                 expectation = self.expectations.popleft()
-                if not (
-                    isinstance(expectation, ServiceRequestSent)
-                    and event.trace_id == expectation.trace_id
-                    and event.service_type is expectation.service_type
-                    and event.method_name is expectation.method_name
-                    and event.args == expectation.args
-                    and event.kwargs == expectation.kwargs
-                ):
+                if not event.matches(expectation):
                     raise NotImplementedError("Inconsistent execution context")
-
                 self.executions[event.id] = self.executions.pop(expectation.id)
                 self.context.append(event)
 
@@ -213,36 +237,23 @@ class Runa[EntityT: Entity]:
             # - ResponseSent
             elif isinstance(event, InitializeResponseSent):
                 expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, InitializeResponseSent)
-                    or event.request_id != expectation.request_id
-                ):
+                if not event.matches(expectation):
                     raise NotImplementedError("Inconsistent execution context")
-
                 self.context.append(event)
             elif isinstance(event, ResponseSent):
                 expectation = self.expectations.popleft()
-                if (
-                    not isinstance(expectation, ResponseSent)
-                    or event.request_id != expectation.request_id
-                    or event.response != expectation.response
-                ):
+                if not event.matches(expectation):
                     raise NotImplementedError("Inconsistent execution context")
-
                 self.context.append(event)
 
             # State changed
             elif isinstance(event, StateChanged):
                 if self.expectations:
                     expectation = self.expectations.popleft()
-                    if (
-                        not isinstance(expectation, StateChanged)
-                        or event.state != expectation.state
-                    ):
+                    if not event.matches(expectation):
                         raise NotImplementedError("Inconsistent execution context")
-
-                self.context.append(event)
                 getattr(self.entity, "__setstate__")(event.state)
+                self.context.append(event)
 
             else:
                 assert_never(event)
