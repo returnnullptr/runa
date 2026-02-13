@@ -68,6 +68,7 @@ class ResponseSent:
 @dataclass(kw_only=True, frozen=True)
 class CreateEntityRequestSent:
     id: str
+    trace_id: str
     entity_type: type[Entity]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
@@ -75,6 +76,7 @@ class CreateEntityRequestSent:
     def matches(self, expectation: object) -> bool:
         return (
             isinstance(expectation, CreateEntityRequestSent)
+            and self.trace_id == expectation.trace_id
             and self.entity_type is expectation.entity_type
             and self.args == expectation.args
             and self.kwargs == expectation.kwargs
@@ -298,7 +300,7 @@ def _intercept_interaction(
 ) -> Generator[None, None, None]:
     main_greenlet = greenlet.getcurrent()
     with (
-        _intercept_create_entity(main_greenlet),
+        _intercept_create_entity(main_greenlet, trace_id),
         _intercept_send_entity_request(main_greenlet, subject, trace_id),
         _intercept_send_service_request(main_greenlet, subject, trace_id),
         # TODO: Protect entity state
@@ -307,11 +309,15 @@ def _intercept_interaction(
 
 
 @contextmanager
-def _intercept_create_entity(main_greenlet: greenlet) -> Generator[None, None, None]:
+def _intercept_create_entity(
+    main_greenlet: greenlet,
+    trace_id: str,
+) -> Generator[None, None, None]:
     def new(cls: type[Entity], *args: Any, **kwargs: Any) -> Entity:
         entity: Entity = main_greenlet.switch(
             CreateEntityRequestSent(
                 id=_generate_event_id(),
+                trace_id=trace_id,
                 entity_type=cls,
                 args=args,
                 kwargs=kwargs,

@@ -250,6 +250,7 @@ def test_create_entity_request_sent() -> None:
         ),
         CreateEntityRequestSent(
             id=result.context[2].id,
+            trace_id="request-1",
             entity_type=Pet,
             args=("Stitch",),
             kwargs={"owner": user.entity},
@@ -274,6 +275,7 @@ def test_create_entity_response_received() -> None:
             ),
             CreateEntityRequestSent(
                 id="create-entity-1",
+                trace_id="request-1",
                 entity_type=Pet,
                 args=("Stitch",),
                 kwargs={"owner": user.entity},
@@ -299,6 +301,7 @@ def test_create_entity_response_received() -> None:
         ),
         CreateEntityRequestSent(
             id="create-entity-1",
+            trace_id="request-1",
             entity_type=Pet,
             args=("Stitch",),
             kwargs={"owner": user.entity},
@@ -622,6 +625,7 @@ def test_initialize_request_received_create_entity_request_sent() -> None:
         ),
         CreateEntityRequestSent(
             id=result.context[1].id,
+            trace_id="request-1",
             entity_type=Readme,
             args=("Research project",),
             kwargs={},
@@ -641,6 +645,7 @@ def test_create_entity_response_received_initialize_response_sent() -> None:
             ),
             CreateEntityRequestSent(
                 id="request-2",
+                trace_id="request-1",
                 entity_type=Readme,
                 args=("Research project",),
                 kwargs={},
@@ -660,6 +665,7 @@ def test_create_entity_response_received_initialize_response_sent() -> None:
         ),
         CreateEntityRequestSent(
             id="request-2",
+            trace_id="request-1",
             entity_type=Readme,
             args=("Research project",),
             kwargs={},
