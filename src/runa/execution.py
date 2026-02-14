@@ -171,8 +171,8 @@ RESPONSE_RECEIVED = (
 )
 
 
-class Runa[EntityT: Entity]:
-    def __init__(self, entity_type: type[EntityT]) -> None:
+class Runa[T: Entity]:
+    def __init__(self, entity_type: type[T]) -> None:
         self.entity_type = entity_type
         self.entity = Entity.__new__(self.entity_type)
         self._executions: dict[int, greenlet] = {}
