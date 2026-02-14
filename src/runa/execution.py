@@ -186,7 +186,14 @@ class Runa[EntityT: Entity]:
         self.context: list[ContextMessage] = []
 
     def execute(self, context: list[ContextMessage]) -> ExecutionResult:
-        for event in context:
+        input_deque = deque(context)
+        for cached_message in self.context:
+            if not input_deque or input_deque.popleft() != cached_message:
+                raise NotImplementedError("Cache miss")
+
+        while input_deque:
+            event = input_deque.popleft()
+
             # Initial request received
             if isinstance(event, InitializeRequestReceived):
                 execution = greenlet(getattr(self.entity_type, "__init__"))
@@ -258,7 +265,8 @@ class Runa[EntityT: Entity]:
                 assert_never(event)
 
         self.context.extend(self.expectations)
-        return ExecutionResult(self.context)
+        self.expectations.clear()
+        return ExecutionResult(self.context.copy())
 
     def _continue(self, execution: greenlet, /, *args: Any, **kwargs: Any) -> None:
         initial_message = self.initial_messages[execution]

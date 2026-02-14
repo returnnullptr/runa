@@ -749,3 +749,69 @@ def test_request_sequence() -> None:
             kwargs={},
         ),
     ]
+
+
+def test_execution_context_cached() -> None:
+    user = Runa(User)
+    pet = Pet("Stitch", owner=user.entity)
+    first_result = user.execute(
+        context=[
+            StateChanged(
+                id="state-changed-1",
+                state=UserState("Yuriy", []),
+            ),
+            RequestReceived(
+                id="request-1",
+                method_name="add_pet",
+                args=(),
+                kwargs={"name": "Stitch"},
+            ),
+            CreateEntityRequestSent(
+                id="create-entity-1",
+                trace_id="request-1",
+                entity_type=Pet,
+                args=("Stitch",),
+                kwargs={"owner": user.entity},
+            ),
+            CreateEntityResponseReceived(
+                id="entity-created-1",
+                request_id="create-entity-1",
+                entity=pet,
+            ),
+        ],
+    )
+    assert first_result.context == [
+        StateChanged(
+            id="state-changed-1",
+            state=UserState("Yuriy", []),
+        ),
+        RequestReceived(
+            id="request-1",
+            method_name="add_pet",
+            args=(),
+            kwargs={"name": "Stitch"},
+        ),
+        CreateEntityRequestSent(
+            id="create-entity-1",
+            trace_id="request-1",
+            entity_type=Pet,
+            args=("Stitch",),
+            kwargs={"owner": user.entity},
+        ),
+        CreateEntityResponseReceived(
+            id="entity-created-1",
+            request_id="create-entity-1",
+            entity=pet,
+        ),
+        ResponseSent(
+            id=first_result.context[4].id,
+            request_id="request-1",
+            response=None,
+        ),
+        StateChanged(
+            id=first_result.context[5].id,
+            state=UserState("Yuriy", [pet]),
+        ),
+    ]
+    second_result = user.execute(first_result.context)
+    assert second_result.context == first_result.context
