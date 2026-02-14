@@ -244,35 +244,36 @@ class Runa[EntityT: Entity]:
         if not execution.dead:
             self.executions[interception.offset] = execution
             self.expectations.append(interception)
-        else:
-            del self.initial_messages[execution]
-            if isinstance(initial_message, InitializeRequestReceived):
-                self.expectations.append(
-                    InitializeResponseSent(
-                        offset=self._next_offset(),
-                        request_offset=initial_message.offset,
-                    )
+            return
+
+        del self.initial_messages[execution]
+        if isinstance(initial_message, InitializeRequestReceived):
+            self.expectations.append(
+                InitializeResponseSent(
+                    offset=self._next_offset(),
+                    request_offset=initial_message.offset,
                 )
-                self.expectations.append(
-                    StateChanged(
-                        offset=self._next_offset(),
-                        state=self.entity.__getstate__(),
-                    )
+            )
+            self.expectations.append(
+                StateChanged(
+                    offset=self._next_offset(),
+                    state=self.entity.__getstate__(),
                 )
-            elif isinstance(initial_message, RequestReceived):
-                self.expectations.append(
-                    ResponseSent(
-                        offset=self._next_offset(),
-                        request_offset=initial_message.offset,
-                        response=interception,
-                    )
+            )
+        elif isinstance(initial_message, RequestReceived):
+            self.expectations.append(
+                ResponseSent(
+                    offset=self._next_offset(),
+                    request_offset=initial_message.offset,
+                    response=interception,
                 )
-                self.expectations.append(
-                    StateChanged(
-                        offset=self._next_offset(),
-                        state=self.entity.__getstate__(),
-                    )
+            )
+            self.expectations.append(
+                StateChanged(
+                    offset=self._next_offset(),
+                    state=self.entity.__getstate__(),
                 )
+            )
 
     @contextmanager
     def _intercept_interaction(
