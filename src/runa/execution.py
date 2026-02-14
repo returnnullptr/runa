@@ -412,6 +412,8 @@ class Runa[EntityT: Entity]:
                     state=self.entity.__getstate__(),
                 ),
             ]
+        else:
+            assert_never(initial_message)
 
     @contextmanager
     def _intercept_interaction(
