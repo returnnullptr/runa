@@ -133,7 +133,6 @@ class Runa[EntityT: Entity]:
         self.entity = Entity.__new__(self.entity_type)
         self.executions: dict[int, greenlet] = {}
         self.initial_messages: dict[greenlet, InitialMessage] = {}
-        self.expectations = deque[ExpectationMessage]()
         self.context: list[ContextMessage] = []
         self._offset = 0
 
@@ -144,6 +143,7 @@ class Runa[EntityT: Entity]:
                 raise NotImplementedError("Cache miss")
             self._offset = cached_message.offset + 1
 
+        expectations = deque[ExpectationMessage]()
         while input_deque:
             event = input_deque.popleft()
 
@@ -156,7 +156,14 @@ class Runa[EntityT: Entity]:
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 self.initial_messages[execution] = event
                 self.context.append(event)
-                self._continue(execution, self.entity, *event.args, **event.kwargs)
+                expectations.extend(
+                    self._continue(
+                        execution,
+                        self.entity,
+                        *event.args,
+                        **event.kwargs,
+                    )
+                )
             elif isinstance(event, RequestReceived):
                 if event.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
@@ -165,7 +172,14 @@ class Runa[EntityT: Entity]:
                 execution = greenlet(getattr(self.entity_type, event.method_name))
                 self.initial_messages[execution] = event
                 self.context.append(event)
-                self._continue(execution, self.entity, *event.args, **event.kwargs)
+                expectations.extend(
+                    self._continue(
+                        execution,
+                        self.entity,
+                        *event.args,
+                        **event.kwargs,
+                    )
+                )
 
             # Response received
             elif isinstance(event, CreateEntityResponseReceived):
@@ -175,7 +189,7 @@ class Runa[EntityT: Entity]:
 
                 execution = self.executions.pop(event.request_offset)
                 self.context.append(event)
-                self._continue(execution, event.entity)
+                expectations.extend(self._continue(execution, event.entity))
             elif isinstance(event, EntityResponseReceived):
                 if event.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
@@ -183,7 +197,7 @@ class Runa[EntityT: Entity]:
 
                 execution = self.executions.pop(event.request_offset)
                 self.context.append(event)
-                self._continue(execution, event.response)
+                expectations.extend(self._continue(execution, event.response))
             elif isinstance(event, ServiceResponseReceived):
                 if event.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
@@ -191,36 +205,36 @@ class Runa[EntityT: Entity]:
 
                 execution = self.executions.pop(event.request_offset)
                 self.context.append(event)
-                self._continue(execution, event.response)
+                expectations.extend(self._continue(execution, event.response))
 
             # Request sent
             elif isinstance(event, CreateEntityRequestSent):
-                if event != self.expectations.popleft():
+                if event != expectations.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self.context.append(event)
             elif isinstance(event, EntityRequestSent):
-                if event != self.expectations.popleft():
+                if event != expectations.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self.context.append(event)
             elif isinstance(event, ServiceRequestSent):
-                if event != self.expectations.popleft():
+                if event != expectations.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self.context.append(event)
 
             # Response sent
             elif isinstance(event, InitializeResponseSent):
-                if event != self.expectations.popleft():
+                if event != expectations.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self.context.append(event)
             elif isinstance(event, ResponseSent):
-                if event != self.expectations.popleft():
+                if event != expectations.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self.context.append(event)
 
             # State changed
             elif isinstance(event, StateChanged):
-                if self.expectations:
-                    if event != self.expectations.popleft():
+                if expectations:
+                    if event != expectations.popleft():
                         raise NotImplementedError("Inconsistent execution context")
                 elif event.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
@@ -231,11 +245,16 @@ class Runa[EntityT: Entity]:
             else:
                 assert_never(event)
 
-        self.context.extend(self.expectations)
-        self.expectations.clear()
+        self.context.extend(expectations)
         return ExecutionResult(self.context.copy())
 
-    def _continue(self, execution: greenlet, /, *args: Any, **kwargs: Any) -> None:
+    def _continue(
+        self,
+        execution: greenlet,
+        /,
+        *args: Any,
+        **kwargs: Any,
+    ) -> list[ExpectationMessage]:
         initial_message = self.initial_messages[execution]
 
         with Runa._intercept_interaction(self, self.entity, initial_message.offset):
@@ -243,37 +262,32 @@ class Runa[EntityT: Entity]:
 
         if not execution.dead:
             self.executions[interception.offset] = execution
-            self.expectations.append(interception)
-            return
+            return [interception]
 
         del self.initial_messages[execution]
         if isinstance(initial_message, InitializeRequestReceived):
-            self.expectations.append(
+            return [
                 InitializeResponseSent(
                     offset=self._next_offset(),
                     request_offset=initial_message.offset,
-                )
-            )
-            self.expectations.append(
+                ),
                 StateChanged(
                     offset=self._next_offset(),
                     state=self.entity.__getstate__(),
-                )
-            )
+                ),
+            ]
         elif isinstance(initial_message, RequestReceived):
-            self.expectations.append(
+            return [
                 ResponseSent(
                     offset=self._next_offset(),
                     request_offset=initial_message.offset,
                     response=interception,
-                )
-            )
-            self.expectations.append(
+                ),
                 StateChanged(
                     offset=self._next_offset(),
                     state=self.entity.__getstate__(),
-                )
-            )
+                ),
+            ]
 
     @contextmanager
     def _intercept_interaction(
