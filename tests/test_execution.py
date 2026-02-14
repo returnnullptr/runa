@@ -2,7 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
-from runa import Entity, Runa, Service
+from runa import Entity, Runa, Service, Error
 from runa.execution import (
     CreateEntityRequestReceived,
     CreateEntityResponseSent,
@@ -15,6 +15,9 @@ from runa.execution import (
     EntityResponseReceived,
     ServiceRequestSent,
     ServiceResponseReceived,
+    EntityErrorReceived,
+    EntityErrorSent,
+    ServiceErrorReceived,
 )
 
 
@@ -78,11 +81,16 @@ class Pet(Entity):
     def __setstate__(self, state: PetState) -> None:
         self.name = state.name
 
-    def change_name(self, user: User, new_name: str) -> bool:
-        if self.owner is user:
-            self.name = new_name
-            return True
-        return False
+    def change_name(self, user: User, new_name: str) -> None:
+        if self.owner is not user:
+            raise UserIsNotPetOwnerError(user, self)
+        self.name = new_name
+
+
+class UserIsNotPetOwnerError(Error):
+    def __init__(self, user: User, pet: Pet) -> None:
+        self.user = user
+        self.pet = pet
 
 
 @dataclass
@@ -98,6 +106,11 @@ class CodeGenerator(Service):
 
     @abstractmethod
     def generate_code(self, tests: str) -> str: ...
+
+
+class CodeGeneratingFailed(Exception):
+    def __init__(self, message: str) -> None:
+        self.message = message
 
 
 class Project(Entity):
@@ -116,9 +129,17 @@ class Project(Entity):
         self.tests = state.tests
         self.code = state.code
 
-    def write_tests_and_code(self) -> None:
-        tests = self.code_generator.generate_tests()
-        self.code_generator.generate_code(tests)
+    def implement(self) -> None:
+        try:
+            tests = self.code_generator.generate_tests()
+            self.code_generator.generate_code(tests)
+        except CodeGeneratingFailed as ex:
+            raise ProjectImplementationError(ex.message)
+
+
+class ProjectImplementationError(Error):
+    def __init__(self, message: str) -> None:
+        self.message = message
 
 
 class Readme(Entity):
@@ -389,7 +410,7 @@ def test_entity_response_received() -> None:
             EntityResponseReceived(
                 offset=3,
                 request_offset=2,
-                response=True,
+                response=None,
             ),
         ],
     )
@@ -415,7 +436,7 @@ def test_entity_response_received() -> None:
         EntityResponseReceived(
             offset=3,
             request_offset=2,
-            response=True,
+            response=None,
         ),
         EntityResponseSent(
             offset=4,
@@ -697,7 +718,7 @@ def test_request_sequence() -> None:
             ),
             EntityRequestReceived(
                 offset=1,
-                method_name="write_tests_and_code",
+                method_name="implement",
                 args=(),
                 kwargs={},
             ),
@@ -723,7 +744,7 @@ def test_request_sequence() -> None:
         ),
         EntityRequestReceived(
             offset=1,
-            method_name="write_tests_and_code",
+            method_name="implement",
             args=(),
             kwargs={},
         ),
@@ -815,3 +836,246 @@ def test_execution_context_cached() -> None:
     ]
     second_result = user.execute(first_result.context)
     assert second_result.context == first_result.context
+
+
+def test_entity_error_received() -> None:
+    user = Runa(User)
+    pet = Pet("Stitch", owner=User("Kate"))
+    result = user.execute(
+        context=[
+            StateChanged(
+                offset=0,
+                state=UserState("Yuriy", []),
+            ),
+            EntityRequestReceived(
+                offset=1,
+                method_name="rename_pet",
+                args=(pet,),
+                kwargs={"new_name": "Helicopter"},
+            ),
+            EntityRequestSent(
+                offset=2,
+                trace_offset=1,
+                receiver=pet,
+                method_name="change_name",
+                args=(user.entity, "Helicopter"),
+                kwargs={},
+            ),
+            EntityErrorReceived(
+                offset=3,
+                request_offset=2,
+                error_type=UserIsNotPetOwnerError,
+                args=(user.entity, pet),
+                kwargs={},
+            ),
+        ]
+    )
+    assert result.context == [
+        StateChanged(
+            offset=0,
+            state=UserState("Yuriy", []),
+        ),
+        EntityRequestReceived(
+            offset=1,
+            method_name="rename_pet",
+            args=(pet,),
+            kwargs={"new_name": "Helicopter"},
+        ),
+        EntityRequestSent(
+            offset=2,
+            trace_offset=1,
+            receiver=pet,
+            method_name="change_name",
+            args=(user.entity, "Helicopter"),
+            kwargs={},
+        ),
+        EntityErrorReceived(
+            offset=3,
+            request_offset=2,
+            error_type=UserIsNotPetOwnerError,
+            args=(user.entity, pet),
+            kwargs={},
+        ),
+        EntityErrorSent(
+            offset=4,
+            request_offset=1,
+            error_type=UserIsNotPetOwnerError,
+            args=(user.entity, pet),
+            kwargs={},
+        ),
+        StateChanged(
+            offset=5,
+            state=UserState("Yuriy", []),
+        ),
+    ]
+
+
+def test_entity_error_sent_next_request_received() -> None:
+    user = Runa(User)
+    pet = Pet("Stitch", owner=User("Kate"))
+    result = user.execute(
+        context=[
+            StateChanged(
+                offset=0,
+                state=UserState("Yuriy", []),
+            ),
+            EntityRequestReceived(
+                offset=1,
+                method_name="rename_pet",
+                args=(pet,),
+                kwargs={"new_name": "Helicopter"},
+            ),
+            EntityRequestSent(
+                offset=2,
+                trace_offset=1,
+                receiver=pet,
+                method_name="change_name",
+                args=(user.entity, "Helicopter"),
+                kwargs={},
+            ),
+            EntityErrorReceived(
+                offset=3,
+                request_offset=2,
+                error_type=UserIsNotPetOwnerError,
+                args=(user.entity, pet),
+                kwargs={},
+            ),
+            EntityErrorSent(
+                offset=4,
+                request_offset=1,
+                error_type=UserIsNotPetOwnerError,
+                args=(user.entity, pet),
+                kwargs={},
+            ),
+            StateChanged(
+                offset=5,
+                state=UserState("Yuriy", []),
+            ),
+            EntityRequestReceived(
+                offset=6,
+                method_name="add_pet",
+                args=(),
+                kwargs={"name": "Helicopter"},
+            ),
+        ]
+    )
+    assert result.context == [
+        StateChanged(
+            offset=0,
+            state=UserState("Yuriy", []),
+        ),
+        EntityRequestReceived(
+            offset=1,
+            method_name="rename_pet",
+            args=(pet,),
+            kwargs={"new_name": "Helicopter"},
+        ),
+        EntityRequestSent(
+            offset=2,
+            trace_offset=1,
+            receiver=pet,
+            method_name="change_name",
+            args=(user.entity, "Helicopter"),
+            kwargs={},
+        ),
+        EntityErrorReceived(
+            offset=3,
+            request_offset=2,
+            error_type=UserIsNotPetOwnerError,
+            args=(user.entity, pet),
+            kwargs={},
+        ),
+        EntityErrorSent(
+            offset=4,
+            request_offset=1,
+            error_type=UserIsNotPetOwnerError,
+            args=(user.entity, pet),
+            kwargs={},
+        ),
+        StateChanged(
+            offset=5,
+            state=UserState("Yuriy", []),
+        ),
+        EntityRequestReceived(
+            offset=6,
+            method_name="add_pet",
+            args=(),
+            kwargs={"name": "Helicopter"},
+        ),
+        CreateEntityRequestSent(
+            offset=7,
+            trace_offset=6,
+            entity_type=Pet,
+            args=("Helicopter",),
+            kwargs={"owner": user.entity},
+        ),
+    ]
+
+
+def test_service_error_received() -> None:
+    project = Runa(Project)
+    readme = Readme("Research project")
+    service_exception = CodeGeneratingFailed("Not enough description")
+    result = project.execute(
+        context=[
+            StateChanged(
+                offset=0,
+                state=ProjectState(readme, None, None),
+            ),
+            EntityRequestReceived(
+                offset=1,
+                method_name="implement",
+                args=(),
+                kwargs={},
+            ),
+            ServiceRequestSent(
+                offset=2,
+                trace_offset=1,
+                service_type=CodeGenerator,
+                method_name="generate_tests",
+                args=(),
+                kwargs={},
+            ),
+            ServiceErrorReceived(
+                offset=3,
+                request_offset=2,
+                exception=service_exception,
+            ),
+        ]
+    )
+    assert result.context == [
+        StateChanged(
+            offset=0,
+            state=ProjectState(readme, None, None),
+        ),
+        EntityRequestReceived(
+            offset=1,
+            method_name="implement",
+            args=(),
+            kwargs={},
+        ),
+        ServiceRequestSent(
+            offset=2,
+            trace_offset=1,
+            service_type=CodeGenerator,
+            method_name="generate_tests",
+            args=(),
+            kwargs={},
+        ),
+        ServiceErrorReceived(
+            offset=3,
+            request_offset=2,
+            exception=service_exception,
+        ),
+        EntityErrorSent(
+            offset=4,
+            request_offset=1,
+            error_type=ProjectImplementationError,
+            args=("Not enough description",),
+            kwargs={},
+        ),
+        StateChanged(
+            offset=5,
+            state=ProjectState(readme, None, None),
+        ),
+    ]
