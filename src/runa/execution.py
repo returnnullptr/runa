@@ -3,7 +3,7 @@ import inspect
 from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator, assert_never, Callable, Sequence
+from typing import Any, Generator, assert_never, Callable, Union, Iterable
 from weakref import WeakKeyDictionary
 
 from greenlet import greenlet
@@ -122,35 +122,35 @@ class ServiceErrorReceived:
     exception: Exception
 
 
-ContextMessage = (
-    StateChanged
-    | CreateEntityRequestReceived
-    | CreateEntityResponseSent
-    | EntityRequestReceived
-    | EntityResponseSent
-    | CreateEntityRequestSent
-    | CreateEntityResponseReceived
-    | EntityRequestSent
-    | EntityResponseReceived
-    | ServiceRequestSent
-    | ServiceResponseReceived
-    | EntityErrorReceived
-    | EntityErrorSent
-    | ServiceErrorReceived
-)
-InitiatorMessage = (
-    CreateEntityRequestReceived  #
-    | EntityRequestReceived
-)
-ExpectationMessage = (
-    StateChanged
-    | CreateEntityResponseSent
-    | EntityResponseSent
-    | CreateEntityRequestSent
-    | EntityRequestSent
-    | ServiceRequestSent
-    | EntityErrorSent
-)
+ContextMessage = Union[
+    StateChanged,
+    CreateEntityRequestReceived,
+    CreateEntityResponseSent,
+    EntityRequestReceived,
+    EntityResponseSent,
+    CreateEntityRequestSent,
+    CreateEntityResponseReceived,
+    EntityRequestSent,
+    EntityResponseReceived,
+    ServiceRequestSent,
+    ServiceResponseReceived,
+    EntityErrorReceived,
+    EntityErrorSent,
+    ServiceErrorReceived,
+]
+InitiatorMessage = Union[
+    CreateEntityRequestReceived,
+    EntityRequestReceived,
+]
+OutputContextMessage = Union[
+    StateChanged,
+    CreateEntityResponseSent,
+    EntityResponseSent,
+    CreateEntityRequestSent,
+    EntityRequestSent,
+    ServiceRequestSent,
+    EntityErrorSent,
+]
 
 RESPONSE_SENT = (
     CreateEntityResponseSent,
@@ -182,17 +182,17 @@ class Runa[T: Entity]:
         self._offset = 0
 
     @property
-    def context(self) -> Sequence[ContextMessage]:
-        return self._context
+    def context(self) -> list[ContextMessage]:
+        return self._context.copy()
 
-    def execute(self, context: Sequence[ContextMessage]) -> None:
-        input_deque = deque(context)
+    def execute(self, messages: Iterable[ContextMessage]) -> list[OutputContextMessage]:
+        input_deque = deque(messages)
         for cached_message in self._context:
             if not input_deque or input_deque.popleft() != cached_message:
                 raise NotImplementedError("Cache miss")
             self._offset = cached_message.offset + 1
 
-        expectations = deque[ExpectationMessage]()
+        output_deque = deque[OutputContextMessage]()
         while input_deque:
             event = input_deque.popleft()
 
@@ -205,7 +205,7 @@ class Runa[T: Entity]:
                 execution = greenlet(getattr(self.entity_type, "__init__"))
                 self._initiators[execution] = event
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -224,7 +224,7 @@ class Runa[T: Entity]:
                 execution = greenlet(getattr(self.entity_type, event.method_name))
                 self._initiators[execution] = event
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -244,7 +244,7 @@ class Runa[T: Entity]:
 
                 execution = self._executions.pop(event.request_offset)
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -260,7 +260,7 @@ class Runa[T: Entity]:
 
                 execution = self._executions.pop(event.request_offset)
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -276,7 +276,7 @@ class Runa[T: Entity]:
 
                 execution = self._executions.pop(event.request_offset)
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -299,7 +299,7 @@ class Runa[T: Entity]:
 
                 execution = self._executions.pop(event.request_offset)
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -316,7 +316,7 @@ class Runa[T: Entity]:
 
                 execution = self._executions.pop(event.request_offset)
                 self._context.append(event)
-                expectations.extend(
+                output_deque.extend(
                     self._continue(
                         execution,
                         functools.partial(
@@ -329,36 +329,36 @@ class Runa[T: Entity]:
 
             # Request sent
             elif isinstance(event, CreateEntityRequestSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
             elif isinstance(event, EntityRequestSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
             elif isinstance(event, ServiceRequestSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
 
             # Response sent
             elif isinstance(event, CreateEntityResponseSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
             elif isinstance(event, EntityResponseSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
             elif isinstance(event, EntityErrorSent):
-                if event != expectations.popleft():
+                if event != output_deque.popleft():
                     raise NotImplementedError("Inconsistent execution context")
                 self._context.append(event)
 
             # State changed
             elif isinstance(event, StateChanged):
-                if expectations:
-                    if event != expectations.popleft():
+                if output_deque:
+                    if event != output_deque.popleft():
                         raise NotImplementedError("Inconsistent execution context")
                 elif event.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
@@ -369,7 +369,8 @@ class Runa[T: Entity]:
             else:
                 assert_never(event)
 
-        self._context.extend(expectations)
+        self._context.extend(output_deque)
+        return list(output_deque)
 
     def cleanup(self) -> list[ContextMessage]:
         processed_offsets = set[int]()
@@ -414,11 +415,11 @@ class Runa[T: Entity]:
         self,
         execution: greenlet,
         switch_to_execution: Callable[[], Any],
-    ) -> list[ExpectationMessage]:
-        initial_message = self._initiators[execution]
+    ) -> list[OutputContextMessage]:
+        initiator = self._initiators[execution]
 
         try:
-            with Runa._intercept_interaction(self, self.entity, initial_message.offset):
+            with Runa._intercept_interaction(self, self.entity, initiator.offset):
                 interception = switch_to_execution()
         except Error as ex:
             try:
@@ -428,7 +429,7 @@ class Runa[T: Entity]:
             return [
                 EntityErrorSent(
                     offset=self._next_offset(),
-                    request_offset=initial_message.offset,
+                    request_offset=initiator.offset,
                     error_type=error_arguments.error_type,
                     args=error_arguments.args,
                     kwargs=error_arguments.kwargs,
@@ -444,22 +445,22 @@ class Runa[T: Entity]:
             return [interception]
 
         del self._initiators[execution]
-        if isinstance(initial_message, CreateEntityRequestReceived):
+        if isinstance(initiator, CreateEntityRequestReceived):
             return [
                 CreateEntityResponseSent(
                     offset=self._next_offset(),
-                    request_offset=initial_message.offset,
+                    request_offset=initiator.offset,
                 ),
                 StateChanged(
                     offset=self._next_offset(),
                     state=self.entity.__getstate__(),
                 ),
             ]
-        elif isinstance(initial_message, EntityRequestReceived):
+        elif isinstance(initiator, EntityRequestReceived):
             return [
                 EntityResponseSent(
                     offset=self._next_offset(),
-                    request_offset=initial_message.offset,
+                    request_offset=initiator.offset,
                     response=interception,
                 ),
                 StateChanged(
@@ -468,7 +469,7 @@ class Runa[T: Entity]:
                 ),
             ]
         else:
-            assert_never(initial_message)
+            assert_never(initiator)
 
     @contextmanager
     def _intercept_interaction(

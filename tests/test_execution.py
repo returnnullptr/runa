@@ -18,6 +18,7 @@ from runa.execution import (
     EntityErrorReceived,
     EntityErrorSent,
     ServiceErrorReceived,
+    ContextMessage,
 )
 
 
@@ -155,22 +156,17 @@ class Readme(Entity):
 
 def test_create_entity_request_received() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            CreateEntityRequestReceived(
-                offset=0,
-                args=("Yura",),
-                kwargs={},
-            ),
-        ],
-    )
-    assert runa.entity.name == "Yura"
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         CreateEntityRequestReceived(
             offset=0,
             args=("Yura",),
             kwargs={},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         CreateEntityResponseSent(
             offset=1,
             request_offset=0,
@@ -180,45 +176,29 @@ def test_create_entity_request_received() -> None:
             state=UserState("Yura", []),
         ),
     ]
+    assert runa.context == input_messages + output_messages
+    assert runa.entity.name == "Yura"
 
 
 def test_state_changed() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yura", []),
-            ),
-        ],
-    )
-    assert runa.entity.name == "Yura"
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yura", []),
         ),
     ]
 
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == []
+    assert runa.context == input_messages + output_messages
+    assert runa.entity.name == "Yura"
+
 
 def test_entity_request_received() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yura", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="change_name",
-                args=("Yuriy",),
-                kwargs={},
-            ),
-        ],
-    )
-    assert runa.entity.name == "Yuriy"
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yura", []),
@@ -229,6 +209,11 @@ def test_entity_request_received() -> None:
             args=("Yuriy",),
             kwargs={},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=2,
             request_offset=1,
@@ -239,26 +224,13 @@ def test_entity_request_received() -> None:
             state=UserState("Yuriy", []),
         ),
     ]
+    assert runa.context == input_messages + output_messages
+    assert runa.entity.name == "Yuriy"
 
 
 def test_create_entity_request_sent() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Stitch"},
-            ),
-        ],
-    )
-    assert not runa.entity.pets
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -269,6 +241,11 @@ def test_create_entity_request_sent() -> None:
             args=(),
             kwargs={"name": "Stitch"},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         CreateEntityRequestSent(
             offset=2,
             trace_offset=1,
@@ -277,39 +254,14 @@ def test_create_entity_request_sent() -> None:
             kwargs={"owner": runa.entity},
         ),
     ]
+    assert runa.context == input_messages + output_messages
+    assert not runa.entity.pets
 
 
 def test_create_entity_response_received() -> None:
     runa = Runa(User)
     pet = Pet("Stitch", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Stitch"},
-            ),
-            CreateEntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                entity_type=Pet,
-                args=("Stitch",),
-                kwargs={"owner": runa.entity},
-            ),
-            CreateEntityResponseReceived(
-                offset=3,
-                request_offset=2,
-                entity=pet,
-            ),
-        ],
-    )
-    assert runa.entity.pets == [pet]
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -332,6 +284,11 @@ def test_create_entity_response_received() -> None:
             request_offset=2,
             entity=pet,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=4,
             request_offset=1,
@@ -342,27 +299,14 @@ def test_create_entity_response_received() -> None:
             state=UserState("Yuriy", [pet]),
         ),
     ]
+    assert runa.context == input_messages + output_messages
+    assert runa.entity.pets == [pet]
 
 
 def test_entity_request_sent() -> None:
     runa = Runa(User)
     pet = Pet("my_cat", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", [pet]),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="rename_pet",
-                args=(pet,),
-                kwargs={"new_name": "Stitch"},
-            ),
-        ],
-    )
-    assert pet.name == "my_cat"
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", [pet]),
@@ -373,6 +317,11 @@ def test_entity_request_sent() -> None:
             args=(pet,),
             kwargs={"new_name": "Stitch"},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityRequestSent(
             offset=2,
             trace_offset=1,
@@ -382,39 +331,14 @@ def test_entity_request_sent() -> None:
             kwargs={},
         ),
     ]
+    assert runa.context == input_messages + output_messages
+    assert pet.name == "my_cat"
 
 
 def test_entity_response_received() -> None:
     runa = Runa(User)
     pet = Pet("Stitch", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", [pet]),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="rename_pet",
-                args=(pet,),
-                kwargs={"new_name": "Stitch"},
-            ),
-            EntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                receiver=pet,
-                method_name="change_name",
-                args=(runa.entity, "Stitch"),
-                kwargs={},
-            ),
-            EntityResponseReceived(
-                offset=3,
-                request_offset=2,
-                response=None,
-            ),
-        ],
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", [pet]),
@@ -438,6 +362,11 @@ def test_entity_response_received() -> None:
             request_offset=2,
             response=None,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=4,
             request_offset=1,
@@ -448,25 +377,12 @@ def test_entity_response_received() -> None:
             state=UserState("Yuriy", [pet]),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_service_request_sent() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="come_up_pet_name",
-                args=(Species.CAT,),
-                kwargs={},
-            ),
-        ],
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -477,6 +393,11 @@ def test_service_request_sent() -> None:
             args=(Species.CAT,),
             kwargs={},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         ServiceRequestSent(
             offset=2,
             trace_offset=1,
@@ -486,38 +407,12 @@ def test_service_request_sent() -> None:
             kwargs={},
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_service_response_received() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="come_up_pet_name",
-                args=(Species.CAT,),
-                kwargs={},
-            ),
-            ServiceRequestSent(
-                offset=2,
-                trace_offset=1,
-                service_type=PetNameGenerator,
-                method_name="generate_name",
-                args=(Species.CAT,),
-                kwargs={},
-            ),
-            ServiceResponseReceived(
-                offset=3,
-                request_offset=2,
-                response="Stitch",
-            ),
-        ],
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -541,6 +436,11 @@ def test_service_response_received() -> None:
             request_offset=2,
             response="Stitch",
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=4,
             request_offset=1,
@@ -551,47 +451,12 @@ def test_service_response_received() -> None:
             state=UserState("Yuriy", []),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_context_not_changed() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="come_up_pet_name",
-                args=(Species.CAT,),
-                kwargs={},
-            ),
-            ServiceRequestSent(
-                offset=2,
-                trace_offset=1,
-                service_type=PetNameGenerator,
-                method_name="generate_name",
-                args=(Species.CAT,),
-                kwargs={},
-            ),
-            ServiceResponseReceived(
-                offset=3,
-                request_offset=2,
-                response="Stitch",
-            ),
-            EntityResponseSent(
-                offset=4,
-                request_offset=1,
-                response="Stitch",
-            ),
-            StateChanged(
-                offset=5,
-                state=UserState("Yuriy", []),
-            ),
-        ],
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -626,24 +491,25 @@ def test_context_not_changed() -> None:
         ),
     ]
 
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == []
+    assert runa.context == input_messages + output_messages
+
 
 def test_create_entity_request_received_create_entity_request_sent() -> None:
     runa = Runa(Project)
-    runa.execute(
-        context=[
-            CreateEntityRequestReceived(
-                offset=0,
-                args=("Research project",),
-                kwargs={},
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         CreateEntityRequestReceived(
             offset=0,
             args=("Research project",),
             kwargs={},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         CreateEntityRequestSent(
             offset=1,
             trace_offset=0,
@@ -652,33 +518,13 @@ def test_create_entity_request_received_create_entity_request_sent() -> None:
             kwargs={},
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_create_entity_response_received_create_entity_response_sent() -> None:
     runa = Runa(Project)
     readme = Readme("Research project")
-    runa.execute(
-        context=[
-            CreateEntityRequestReceived(
-                offset=0,
-                args=("Research project",),
-                kwargs={},
-            ),
-            CreateEntityRequestSent(
-                offset=1,
-                trace_offset=0,
-                entity_type=Readme,
-                args=("Research project",),
-                kwargs={},
-            ),
-            CreateEntityResponseReceived(
-                offset=2,
-                request_offset=1,
-                entity=readme,
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         CreateEntityRequestReceived(
             offset=0,
             args=("Research project",),
@@ -696,6 +542,11 @@ def test_create_entity_response_received_create_entity_response_sent() -> None:
             request_offset=1,
             entity=readme,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         CreateEntityResponseSent(
             offset=3,
             request_offset=0,
@@ -705,39 +556,13 @@ def test_create_entity_response_received_create_entity_response_sent() -> None:
             state=ProjectState(readme, None, None),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_request_sequence() -> None:
     runa = Runa(Project)
     readme = Readme("Research project")
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=ProjectState(readme, None, None),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="implement",
-                args=(),
-                kwargs={},
-            ),
-            ServiceRequestSent(
-                offset=2,
-                trace_offset=1,
-                service_type=CodeGenerator,
-                method_name="generate_tests",
-                args=(),
-                kwargs={},
-            ),
-            ServiceResponseReceived(
-                offset=3,
-                request_offset=2,
-                response="def test_nothing() -> None: assert True",
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=ProjectState(readme, None, None),
@@ -761,6 +586,11 @@ def test_request_sequence() -> None:
             request_offset=2,
             response="def test_nothing() -> None: assert True",
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         ServiceRequestSent(
             offset=4,
             trace_offset=1,
@@ -770,38 +600,13 @@ def test_request_sequence() -> None:
             kwargs={},
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_execution_context_cached() -> None:
     runa = Runa(User)
     pet = Pet("Stitch", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Stitch"},
-            ),
-            CreateEntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                entity_type=Pet,
-                args=("Stitch",),
-                kwargs={"owner": runa.entity},
-            ),
-            CreateEntityResponseReceived(
-                offset=3,
-                request_offset=2,
-                entity=pet,
-            ),
-        ],
-    )
-    expected_context = [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -824,6 +629,11 @@ def test_execution_context_cached() -> None:
             request_offset=2,
             entity=pet,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=4,
             request_offset=1,
@@ -834,44 +644,15 @@ def test_execution_context_cached() -> None:
             state=UserState("Yuriy", [pet]),
         ),
     ]
-    assert runa._context == expected_context
-    runa.execute(runa._context)
-    assert runa._context == expected_context
+    assert runa.context == input_messages + output_messages
+    assert runa.execute(runa.context) == []
+    assert runa.context == input_messages + output_messages
 
 
 def test_entity_error_received() -> None:
     runa = Runa(User)
     pet = Pet("Stitch", owner=User("Kate"))
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="rename_pet",
-                args=(pet,),
-                kwargs={"new_name": "Helicopter"},
-            ),
-            EntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                receiver=pet,
-                method_name="change_name",
-                args=(runa.entity, "Helicopter"),
-                kwargs={},
-            ),
-            EntityErrorReceived(
-                offset=3,
-                request_offset=2,
-                error_type=UserIsNotPetOwnerError,
-                args=(runa.entity, pet),
-                kwargs={},
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -897,6 +678,11 @@ def test_entity_error_received() -> None:
             args=(runa.entity, pet),
             kwargs={},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityErrorSent(
             offset=4,
             request_offset=1,
@@ -909,58 +695,13 @@ def test_entity_error_received() -> None:
             state=UserState("Yuriy", []),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_entity_error_sent_next_request_received() -> None:
     runa = Runa(User)
     pet = Pet("Stitch", owner=User("Kate"))
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="rename_pet",
-                args=(pet,),
-                kwargs={"new_name": "Helicopter"},
-            ),
-            EntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                receiver=pet,
-                method_name="change_name",
-                args=(runa.entity, "Helicopter"),
-                kwargs={},
-            ),
-            EntityErrorReceived(
-                offset=3,
-                request_offset=2,
-                error_type=UserIsNotPetOwnerError,
-                args=(runa.entity, pet),
-                kwargs={},
-            ),
-            EntityErrorSent(
-                offset=4,
-                request_offset=1,
-                error_type=UserIsNotPetOwnerError,
-                args=(runa.entity, pet),
-                kwargs={},
-            ),
-            StateChanged(
-                offset=5,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=6,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Helicopter"},
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -1003,6 +744,11 @@ def test_entity_error_sent_next_request_received() -> None:
             args=(),
             kwargs={"name": "Helicopter"},
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         CreateEntityRequestSent(
             offset=7,
             trace_offset=6,
@@ -1011,40 +757,14 @@ def test_entity_error_sent_next_request_received() -> None:
             kwargs={"owner": runa.entity},
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_service_error_received() -> None:
     runa = Runa(Project)
     readme = Readme("Research project")
     service_exception = CodeGeneratingFailed("Not enough description")
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=ProjectState(readme, None, None),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="implement",
-                args=(),
-                kwargs={},
-            ),
-            ServiceRequestSent(
-                offset=2,
-                trace_offset=1,
-                service_type=CodeGenerator,
-                method_name="generate_tests",
-                args=(),
-                kwargs={},
-            ),
-            ServiceErrorReceived(
-                offset=3,
-                request_offset=2,
-                exception=service_exception,
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=ProjectState(readme, None, None),
@@ -1068,6 +788,11 @@ def test_service_error_received() -> None:
             request_offset=2,
             exception=service_exception,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityErrorSent(
             offset=4,
             request_offset=1,
@@ -1080,51 +805,13 @@ def test_service_error_received() -> None:
             state=ProjectState(readme, None, None),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_asynchronous_requests_received() -> None:
     runa = Runa(User)
     kisaka_san = Pet("Kisaka-san", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Stitch"},
-            ),
-            CreateEntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                entity_type=Pet,
-                args=("Stitch",),
-                kwargs={"owner": runa.entity},
-            ),
-            EntityRequestReceived(
-                offset=3,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Kisaka-san"},
-            ),
-            CreateEntityRequestSent(
-                offset=4,
-                trace_offset=3,
-                entity_type=Pet,
-                args=("Kisaka-san",),
-                kwargs={"owner": runa.entity},
-            ),
-            CreateEntityResponseReceived(
-                offset=5,
-                request_offset=4,
-                entity=kisaka_san,
-            ),
-        ]
-    )
-    assert runa._context == [
+    input_messages: list[ContextMessage] = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -1160,6 +847,11 @@ def test_asynchronous_requests_received() -> None:
             request_offset=4,
             entity=kisaka_san,
         ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
         EntityResponseSent(
             offset=6,
             request_offset=3,
@@ -1170,50 +862,63 @@ def test_asynchronous_requests_received() -> None:
             state=UserState("Yuriy", [kisaka_san]),
         ),
     ]
+    assert runa.context == input_messages + output_messages
 
 
 def test_cleanup_remove_processed_messages() -> None:
     runa = Runa(User)
     kisaka_san = Pet("Kisaka-san", owner=runa.entity)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yuriy", []),
-            ),
-            EntityRequestReceived(
-                offset=1,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Stitch"},
-            ),
-            CreateEntityRequestSent(
-                offset=2,
-                trace_offset=1,
-                entity_type=Pet,
-                args=("Stitch",),
-                kwargs={"owner": runa.entity},
-            ),
-            EntityRequestReceived(
-                offset=3,
-                method_name="add_pet",
-                args=(),
-                kwargs={"name": "Kisaka-san"},
-            ),
-            CreateEntityRequestSent(
-                offset=4,
-                trace_offset=3,
-                entity_type=Pet,
-                args=("Kisaka-san",),
-                kwargs={"owner": runa.entity},
-            ),
-            CreateEntityResponseReceived(
-                offset=5,
-                request_offset=4,
-                entity=kisaka_san,
-            ),
-        ]
-    )
+    input_messages: list[ContextMessage] = [
+        StateChanged(
+            offset=0,
+            state=UserState("Yuriy", []),
+        ),
+        EntityRequestReceived(
+            offset=1,
+            method_name="add_pet",
+            args=(),
+            kwargs={"name": "Stitch"},
+        ),
+        CreateEntityRequestSent(
+            offset=2,
+            trace_offset=1,
+            entity_type=Pet,
+            args=("Stitch",),
+            kwargs={"owner": runa.entity},
+        ),
+        EntityRequestReceived(
+            offset=3,
+            method_name="add_pet",
+            args=(),
+            kwargs={"name": "Kisaka-san"},
+        ),
+        CreateEntityRequestSent(
+            offset=4,
+            trace_offset=3,
+            entity_type=Pet,
+            args=("Kisaka-san",),
+            kwargs={"owner": runa.entity},
+        ),
+        CreateEntityResponseReceived(
+            offset=5,
+            request_offset=4,
+            entity=kisaka_san,
+        ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == [
+        EntityResponseSent(
+            offset=6,
+            request_offset=3,
+            response=None,
+        ),
+        StateChanged(
+            offset=7,
+            state=UserState("Yuriy", [kisaka_san]),
+        ),
+    ]
     assert runa.cleanup() == [
         EntityRequestReceived(
             offset=3,
@@ -1239,7 +944,7 @@ def test_cleanup_remove_processed_messages() -> None:
             response=None,
         ),
     ]
-    assert runa._context == [
+    assert runa.context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -1266,25 +971,27 @@ def test_cleanup_remove_processed_messages() -> None:
 
 def test_cleanup_collapse_state_changed() -> None:
     runa = Runa(User)
-    runa.execute(
-        context=[
-            StateChanged(
-                offset=0,
-                state=UserState("Yura", []),
-            ),
-            StateChanged(
-                offset=1,
-                state=UserState("Yuriy", []),
-            ),
-        ]
-    )
+    input_messages: list[ContextMessage] = [
+        StateChanged(
+            offset=0,
+            state=UserState("Yura", []),
+        ),
+        StateChanged(
+            offset=1,
+            state=UserState("Yuriy", []),
+        ),
+    ]
+
+    output_messages = runa.execute(input_messages)
+
+    assert output_messages == []
     assert runa.cleanup() == [
         StateChanged(
             offset=0,
             state=UserState("Yura", []),
         ),
     ]
-    assert runa._context == [
+    assert runa.context == [
         StateChanged(
             offset=1,
             state=UserState("Yuriy", []),
