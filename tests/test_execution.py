@@ -89,7 +89,7 @@ class Pet(Entity):
 
 class UserIsNotPetOwnerError(Error):
     def __init__(self, user: User, pet: Pet) -> None:
-        self.user = user
+        self.runa = user
         self.pet = pet
 
 
@@ -154,8 +154,8 @@ class Readme(Entity):
 
 
 def test_create_entity_request_received() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             CreateEntityRequestReceived(
                 offset=0,
@@ -164,8 +164,8 @@ def test_create_entity_request_received() -> None:
             ),
         ],
     )
-    assert user.entity.name == "Yura"
-    assert result.context == [
+    assert runa.entity.name == "Yura"
+    assert runa._context == [
         CreateEntityRequestReceived(
             offset=0,
             args=("Yura",),
@@ -183,8 +183,8 @@ def test_create_entity_request_received() -> None:
 
 
 def test_state_changed() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -192,8 +192,8 @@ def test_state_changed() -> None:
             ),
         ],
     )
-    assert user.entity.name == "Yura"
-    assert result.context == [
+    assert runa.entity.name == "Yura"
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yura", []),
@@ -202,8 +202,8 @@ def test_state_changed() -> None:
 
 
 def test_entity_request_received() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -217,8 +217,8 @@ def test_entity_request_received() -> None:
             ),
         ],
     )
-    assert user.entity.name == "Yuriy"
-    assert result.context == [
+    assert runa.entity.name == "Yuriy"
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yura", []),
@@ -242,8 +242,8 @@ def test_entity_request_received() -> None:
 
 
 def test_create_entity_request_sent() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -257,8 +257,8 @@ def test_create_entity_request_sent() -> None:
             ),
         ],
     )
-    assert not user.entity.pets
-    assert result.context == [
+    assert not runa.entity.pets
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -274,15 +274,15 @@ def test_create_entity_request_sent() -> None:
             trace_offset=1,
             entity_type=Pet,
             args=("Stitch",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
     ]
 
 
 def test_create_entity_response_received() -> None:
-    user = Runa(User)
-    pet = Pet("Stitch", owner=user.entity)
-    result = user.execute(
+    runa = Runa(User)
+    pet = Pet("Stitch", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -299,7 +299,7 @@ def test_create_entity_response_received() -> None:
                 trace_offset=1,
                 entity_type=Pet,
                 args=("Stitch",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             CreateEntityResponseReceived(
                 offset=3,
@@ -308,8 +308,8 @@ def test_create_entity_response_received() -> None:
             ),
         ],
     )
-    assert user.entity.pets == [pet]
-    assert result.context == [
+    assert runa.entity.pets == [pet]
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -325,7 +325,7 @@ def test_create_entity_response_received() -> None:
             trace_offset=1,
             entity_type=Pet,
             args=("Stitch",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         CreateEntityResponseReceived(
             offset=3,
@@ -345,9 +345,9 @@ def test_create_entity_response_received() -> None:
 
 
 def test_entity_request_sent() -> None:
-    user = Runa(User)
-    pet = Pet("my_cat", owner=user.entity)
-    result = user.execute(
+    runa = Runa(User)
+    pet = Pet("my_cat", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -362,7 +362,7 @@ def test_entity_request_sent() -> None:
         ],
     )
     assert pet.name == "my_cat"
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", [pet]),
@@ -378,16 +378,16 @@ def test_entity_request_sent() -> None:
             trace_offset=1,
             receiver=pet,
             method_name="change_name",
-            args=(user.entity, "Stitch"),
+            args=(runa.entity, "Stitch"),
             kwargs={},
         ),
     ]
 
 
 def test_entity_response_received() -> None:
-    user = Runa(User)
-    pet = Pet("Stitch", owner=user.entity)
-    result = user.execute(
+    runa = Runa(User)
+    pet = Pet("Stitch", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -404,7 +404,7 @@ def test_entity_response_received() -> None:
                 trace_offset=1,
                 receiver=pet,
                 method_name="change_name",
-                args=(user.entity, "Stitch"),
+                args=(runa.entity, "Stitch"),
                 kwargs={},
             ),
             EntityResponseReceived(
@@ -414,7 +414,7 @@ def test_entity_response_received() -> None:
             ),
         ],
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", [pet]),
@@ -430,7 +430,7 @@ def test_entity_response_received() -> None:
             trace_offset=1,
             receiver=pet,
             method_name="change_name",
-            args=(user.entity, "Stitch"),
+            args=(runa.entity, "Stitch"),
             kwargs={},
         ),
         EntityResponseReceived(
@@ -451,8 +451,8 @@ def test_entity_response_received() -> None:
 
 
 def test_service_request_sent() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -466,7 +466,7 @@ def test_service_request_sent() -> None:
             ),
         ],
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -489,8 +489,8 @@ def test_service_request_sent() -> None:
 
 
 def test_service_response_received() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -517,7 +517,7 @@ def test_service_response_received() -> None:
             ),
         ],
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -554,8 +554,8 @@ def test_service_response_received() -> None:
 
 
 def test_context_not_changed() -> None:
-    user = Runa(User)
-    result = user.execute(
+    runa = Runa(User)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -591,7 +591,7 @@ def test_context_not_changed() -> None:
             ),
         ],
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -628,8 +628,8 @@ def test_context_not_changed() -> None:
 
 
 def test_create_entity_request_received_create_entity_request_sent() -> None:
-    project = Runa(Project)
-    result = project.execute(
+    runa = Runa(Project)
+    runa.execute(
         context=[
             CreateEntityRequestReceived(
                 offset=0,
@@ -638,7 +638,7 @@ def test_create_entity_request_received_create_entity_request_sent() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         CreateEntityRequestReceived(
             offset=0,
             args=("Research project",),
@@ -655,9 +655,9 @@ def test_create_entity_request_received_create_entity_request_sent() -> None:
 
 
 def test_create_entity_response_received_create_entity_response_sent() -> None:
-    project = Runa(Project)
+    runa = Runa(Project)
     readme = Readme("Research project")
-    result = project.execute(
+    runa.execute(
         context=[
             CreateEntityRequestReceived(
                 offset=0,
@@ -678,7 +678,7 @@ def test_create_entity_response_received_create_entity_response_sent() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         CreateEntityRequestReceived(
             offset=0,
             args=("Research project",),
@@ -708,9 +708,9 @@ def test_create_entity_response_received_create_entity_response_sent() -> None:
 
 
 def test_request_sequence() -> None:
-    project = Runa(Project)
+    runa = Runa(Project)
     readme = Readme("Research project")
-    result = project.execute(
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -737,7 +737,7 @@ def test_request_sequence() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=ProjectState(readme, None, None),
@@ -773,9 +773,9 @@ def test_request_sequence() -> None:
 
 
 def test_execution_context_cached() -> None:
-    user = Runa(User)
-    pet = Pet("Stitch", owner=user.entity)
-    first_result = user.execute(
+    runa = Runa(User)
+    pet = Pet("Stitch", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -792,7 +792,7 @@ def test_execution_context_cached() -> None:
                 trace_offset=1,
                 entity_type=Pet,
                 args=("Stitch",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             CreateEntityResponseReceived(
                 offset=3,
@@ -801,7 +801,7 @@ def test_execution_context_cached() -> None:
             ),
         ],
     )
-    assert first_result.context == [
+    expected_context = [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -817,7 +817,7 @@ def test_execution_context_cached() -> None:
             trace_offset=1,
             entity_type=Pet,
             args=("Stitch",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         CreateEntityResponseReceived(
             offset=3,
@@ -834,14 +834,15 @@ def test_execution_context_cached() -> None:
             state=UserState("Yuriy", [pet]),
         ),
     ]
-    second_result = user.execute(first_result.context)
-    assert second_result.context == first_result.context
+    assert runa._context == expected_context
+    runa.execute(runa._context)
+    assert runa._context == expected_context
 
 
 def test_entity_error_received() -> None:
-    user = Runa(User)
+    runa = Runa(User)
     pet = Pet("Stitch", owner=User("Kate"))
-    result = user.execute(
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -858,19 +859,19 @@ def test_entity_error_received() -> None:
                 trace_offset=1,
                 receiver=pet,
                 method_name="change_name",
-                args=(user.entity, "Helicopter"),
+                args=(runa.entity, "Helicopter"),
                 kwargs={},
             ),
             EntityErrorReceived(
                 offset=3,
                 request_offset=2,
                 error_type=UserIsNotPetOwnerError,
-                args=(user.entity, pet),
+                args=(runa.entity, pet),
                 kwargs={},
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -886,21 +887,21 @@ def test_entity_error_received() -> None:
             trace_offset=1,
             receiver=pet,
             method_name="change_name",
-            args=(user.entity, "Helicopter"),
+            args=(runa.entity, "Helicopter"),
             kwargs={},
         ),
         EntityErrorReceived(
             offset=3,
             request_offset=2,
             error_type=UserIsNotPetOwnerError,
-            args=(user.entity, pet),
+            args=(runa.entity, pet),
             kwargs={},
         ),
         EntityErrorSent(
             offset=4,
             request_offset=1,
             error_type=UserIsNotPetOwnerError,
-            args=(user.entity, pet),
+            args=(runa.entity, pet),
             kwargs={},
         ),
         StateChanged(
@@ -911,9 +912,9 @@ def test_entity_error_received() -> None:
 
 
 def test_entity_error_sent_next_request_received() -> None:
-    user = Runa(User)
+    runa = Runa(User)
     pet = Pet("Stitch", owner=User("Kate"))
-    result = user.execute(
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -930,21 +931,21 @@ def test_entity_error_sent_next_request_received() -> None:
                 trace_offset=1,
                 receiver=pet,
                 method_name="change_name",
-                args=(user.entity, "Helicopter"),
+                args=(runa.entity, "Helicopter"),
                 kwargs={},
             ),
             EntityErrorReceived(
                 offset=3,
                 request_offset=2,
                 error_type=UserIsNotPetOwnerError,
-                args=(user.entity, pet),
+                args=(runa.entity, pet),
                 kwargs={},
             ),
             EntityErrorSent(
                 offset=4,
                 request_offset=1,
                 error_type=UserIsNotPetOwnerError,
-                args=(user.entity, pet),
+                args=(runa.entity, pet),
                 kwargs={},
             ),
             StateChanged(
@@ -959,7 +960,7 @@ def test_entity_error_sent_next_request_received() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -975,21 +976,21 @@ def test_entity_error_sent_next_request_received() -> None:
             trace_offset=1,
             receiver=pet,
             method_name="change_name",
-            args=(user.entity, "Helicopter"),
+            args=(runa.entity, "Helicopter"),
             kwargs={},
         ),
         EntityErrorReceived(
             offset=3,
             request_offset=2,
             error_type=UserIsNotPetOwnerError,
-            args=(user.entity, pet),
+            args=(runa.entity, pet),
             kwargs={},
         ),
         EntityErrorSent(
             offset=4,
             request_offset=1,
             error_type=UserIsNotPetOwnerError,
-            args=(user.entity, pet),
+            args=(runa.entity, pet),
             kwargs={},
         ),
         StateChanged(
@@ -1007,16 +1008,16 @@ def test_entity_error_sent_next_request_received() -> None:
             trace_offset=6,
             entity_type=Pet,
             args=("Helicopter",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
     ]
 
 
 def test_service_error_received() -> None:
-    project = Runa(Project)
+    runa = Runa(Project)
     readme = Readme("Research project")
     service_exception = CodeGeneratingFailed("Not enough description")
-    result = project.execute(
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -1043,7 +1044,7 @@ def test_service_error_received() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=ProjectState(readme, None, None),
@@ -1082,9 +1083,9 @@ def test_service_error_received() -> None:
 
 
 def test_asynchronous_requests_received() -> None:
-    user = Runa(User)
-    kisaka_san = Pet("Kisaka-san", owner=user.entity)
-    result = user.execute(
+    runa = Runa(User)
+    kisaka_san = Pet("Kisaka-san", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -1101,7 +1102,7 @@ def test_asynchronous_requests_received() -> None:
                 trace_offset=1,
                 entity_type=Pet,
                 args=("Stitch",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             EntityRequestReceived(
                 offset=3,
@@ -1114,7 +1115,7 @@ def test_asynchronous_requests_received() -> None:
                 trace_offset=3,
                 entity_type=Pet,
                 args=("Kisaka-san",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             CreateEntityResponseReceived(
                 offset=5,
@@ -1123,7 +1124,7 @@ def test_asynchronous_requests_received() -> None:
             ),
         ]
     )
-    assert result.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -1139,7 +1140,7 @@ def test_asynchronous_requests_received() -> None:
             trace_offset=1,
             entity_type=Pet,
             args=("Stitch",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         EntityRequestReceived(
             offset=3,
@@ -1152,7 +1153,7 @@ def test_asynchronous_requests_received() -> None:
             trace_offset=3,
             entity_type=Pet,
             args=("Kisaka-san",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         CreateEntityResponseReceived(
             offset=5,
@@ -1172,9 +1173,9 @@ def test_asynchronous_requests_received() -> None:
 
 
 def test_cleanup_remove_processed_messages() -> None:
-    user = Runa(User)
-    kisaka_san = Pet("Kisaka-san", owner=user.entity)
-    user.execute(
+    runa = Runa(User)
+    kisaka_san = Pet("Kisaka-san", owner=runa.entity)
+    runa.execute(
         context=[
             StateChanged(
                 offset=0,
@@ -1191,7 +1192,7 @@ def test_cleanup_remove_processed_messages() -> None:
                 trace_offset=1,
                 entity_type=Pet,
                 args=("Stitch",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             EntityRequestReceived(
                 offset=3,
@@ -1204,7 +1205,7 @@ def test_cleanup_remove_processed_messages() -> None:
                 trace_offset=3,
                 entity_type=Pet,
                 args=("Kisaka-san",),
-                kwargs={"owner": user.entity},
+                kwargs={"owner": runa.entity},
             ),
             CreateEntityResponseReceived(
                 offset=5,
@@ -1213,7 +1214,7 @@ def test_cleanup_remove_processed_messages() -> None:
             ),
         ]
     )
-    assert user.cleanup() == [
+    assert runa.cleanup() == [
         EntityRequestReceived(
             offset=3,
             method_name="add_pet",
@@ -1225,7 +1226,7 @@ def test_cleanup_remove_processed_messages() -> None:
             trace_offset=3,
             entity_type=Pet,
             args=("Kisaka-san",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         CreateEntityResponseReceived(
             offset=5,
@@ -1238,7 +1239,7 @@ def test_cleanup_remove_processed_messages() -> None:
             response=None,
         ),
     ]
-    assert user.context == [
+    assert runa._context == [
         StateChanged(
             offset=0,
             state=UserState("Yuriy", []),
@@ -1254,7 +1255,7 @@ def test_cleanup_remove_processed_messages() -> None:
             trace_offset=1,
             entity_type=Pet,
             args=("Stitch",),
-            kwargs={"owner": user.entity},
+            kwargs={"owner": runa.entity},
         ),
         StateChanged(
             offset=7,
@@ -1283,7 +1284,7 @@ def test_cleanup_collapse_state_changed() -> None:
             state=UserState("Yura", []),
         ),
     ]
-    assert runa.context == [
+    assert runa._context == [
         StateChanged(
             offset=1,
             state=UserState("Yuriy", []),
