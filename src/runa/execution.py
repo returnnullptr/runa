@@ -74,7 +74,10 @@ class Execution[Subject: Entity]:
                 if isinstance(message, CreateEntityRequestReceived):
                     method = getattr(type(self.subject), "__init__")
                 elif isinstance(message, EntityMethodRequestReceived):
-                    method = getattr(type(self.subject), message.method_name)
+                    if not message.method in vars(type(self.subject)).values():
+                        # TODO: Test this behavior
+                        raise NotImplementedError("Undefined entity method")
+                    method = message.method
                 else:
                     assert_never(message)  # pragma: no cover
 
@@ -359,7 +362,7 @@ class Execution[Subject: Entity]:
                         offset=self._next_offset(),
                         trace_offset=trace_offset,
                         receiver=entity,
-                        method_name=name,
+                        method=original_method,
                         args=args,
                         kwargs=kwargs,
                     )
@@ -399,7 +402,7 @@ class Execution[Subject: Entity]:
                         offset=self._next_offset(),
                         trace_offset=trace_offset,
                         service_type=type(service),
-                        method_name=name,
+                        method=original_method,
                         args=args,
                         kwargs=kwargs,
                     )

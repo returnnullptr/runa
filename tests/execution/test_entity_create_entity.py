@@ -145,7 +145,7 @@ def test_entity_method_request_received_then_create_entity_request_sent() -> Non
         ),
         EntityMethodRequestReceived(
             offset=1,
-            method_name="make",
+            method=Factory.make,
             args=("Pencil",),
             kwargs={},
         ),
@@ -181,7 +181,7 @@ def test_create_entity_response_received_then_entity_method_response_sent() -> N
         ),
         EntityMethodRequestReceived(
             offset=1,
-            method_name="make",
+            method=Factory.make,
             args=("Pencil",),
             kwargs={},
         ),
@@ -315,7 +315,7 @@ def test_create_entity_error_received_then_entity_method_error_sent() -> None:
         ),
         EntityMethodRequestReceived(
             offset=1,
-            method_name="make",
+            method=Factory.make,
             args=("Pencil",),
             kwargs={},
         ),

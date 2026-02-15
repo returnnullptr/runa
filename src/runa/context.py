@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Union
 
@@ -56,7 +57,7 @@ class EntityMethodRequestSent:
     offset: int
     trace_offset: int
     receiver: Entity
-    method_name: str
+    method: Callable[..., Any]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
@@ -64,7 +65,7 @@ class EntityMethodRequestSent:
 @dataclass(kw_only=True, frozen=True)
 class EntityMethodRequestReceived:
     offset: int
-    method_name: str
+    method: Callable[..., Any]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
@@ -106,7 +107,7 @@ class ServiceMethodRequestSent:
     offset: int
     trace_offset: int
     service_type: type[Service]
-    method_name: str
+    method: Callable[..., Any]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 

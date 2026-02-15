@@ -96,7 +96,7 @@ def test_entity_method_request_received_then_entity_state_changed() -> None:
         ),
         EntityMethodRequestReceived(
             offset=1,
-            method_name="increment",
+            method=Counter.increment,
             args=(32,),
             kwargs={},
         ),

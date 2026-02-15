@@ -113,7 +113,7 @@ def test_execution_completion() -> None:
             offset=1,
             trace_offset=0,
             service_type=LLM,
-            method_name="complete",
+            method=LLM.complete,
             args=(),
             kwargs={
                 "prompt": dedent("""
@@ -142,7 +142,7 @@ def test_execution_completion() -> None:
             offset=3,
             trace_offset=0,
             service_type=LLM,
-            method_name="complete",
+            method=LLM.complete,
             args=(),
             kwargs={
                 "prompt": dedent("""
@@ -192,7 +192,7 @@ def test_execution_completion() -> None:
     input_messages = execution.context + [
         EntityMethodRequestReceived(
             offset=7,
-            method_name="fix_tests",
+            method=Project.fix_tests,
             args=("2 + 2 is 4",),
             kwargs={},
         )
@@ -203,7 +203,7 @@ def test_execution_completion() -> None:
             offset=8,
             trace_offset=7,
             service_type=LLM,
-            method_name="complete",
+            method=LLM.complete,
             args=(),
             kwargs={
                 "prompt": dedent("""
@@ -225,7 +225,7 @@ def test_execution_completion() -> None:
     input_messages = execution.context + [
         EntityMethodRequestReceived(
             offset=9,
-            method_name="fix_code",
+            method=Project.fix_code,
             args=("No need to add 1 to the result",),
             kwargs={},
         )
@@ -236,7 +236,7 @@ def test_execution_completion() -> None:
             offset=10,
             trace_offset=9,
             service_type=LLM,
-            method_name="complete",
+            method=LLM.complete,
             args=(),
             kwargs={
                 "prompt": dedent("""
@@ -286,7 +286,7 @@ def test_execution_completion() -> None:
         ),
         EntityMethodRequestReceived(
             offset=7,
-            method_name="fix_tests",
+            method=Project.fix_tests,
             args=("2 + 2 is 4",),
             kwargs={},
         ),
@@ -294,7 +294,7 @@ def test_execution_completion() -> None:
             offset=8,
             trace_offset=7,
             service_type=LLM,
-            method_name="complete",
+            method=LLM.complete,
             args=(),
             kwargs={
                 "prompt": dedent("""
