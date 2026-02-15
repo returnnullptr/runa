@@ -98,7 +98,7 @@ class Project(Entity):
         )
 
 
-def test_continuous_execution() -> None:
+def test_execution_completion() -> None:
     execution = Execution(Project)
     input_messages: list[ContextMessage] = [
         CreateEntityRequestReceived(
