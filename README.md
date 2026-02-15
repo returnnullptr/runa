@@ -1,6 +1,6 @@
 # Runa
 
-Domain logic isolation research
+Execution completion model
 
 ## Glossary
 
@@ -15,15 +15,15 @@ Domain logic isolation research
 
 ## Rules
 
-- An entity can access and modify its own state.
-- An entity cannot access or modify another entity's state.
-- An entity interacts with other entities or services only through messages.
-- An entity receives messages in the same order they were produced.
-- An entity or service processes every message it receives.
-- An entity or service replies to every request it receives.
-- An entity can send requests to other entities or services.
-- An entity can create other entities.
-- An entity receives a response for every request it sends.
-- An entity can publish events.
-- Processing can be suspended until a response is received.
-- An execution context can be saved and restored during processing.
+- [x] An entity can access and modify its own state.
+- [ ] An entity cannot access or modify another entity's state.
+- [x] An entity interacts with other entities or services only through messages.
+- [x] An entity receives messages in the same order they were produced.
+- [x] An entity or service processes every message it receives.
+- [x] An entity or service replies to every request it receives.
+- [x] An entity can send requests to other entities or services.
+- [x] An entity can create other entities.
+- [x] An entity receives a response for every request it sends.
+- [ ] An entity can publish events.
+- [x] Processing can be suspended until a response is received.
+- [x] An execution context can be saved and restored during processing.
