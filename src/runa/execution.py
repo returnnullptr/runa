@@ -48,6 +48,7 @@ class Execution[Subject: Entity]:
     def complete(self, messages: Iterable[ContextMessage]) -> list[OutputMessage]:
         input_iterator = iter(messages)
         for message in self._context:
+            # TODO: Reset execution state and raise custom error
             try:
                 if message != next(input_iterator):
                     raise NotImplementedError("Cache miss")
@@ -56,6 +57,7 @@ class Execution[Subject: Entity]:
 
             self._offset = message.offset + 1
 
+        # TODO: Wrap with try-except and reset execution state in case of error
         output_messages = deque[OutputMessage]()
         while True:
             try:
@@ -64,6 +66,7 @@ class Execution[Subject: Entity]:
                 break
 
             if isinstance(message, REQUEST_RECEIVED):
+                # TODO: Reset execution state and raise custom error
                 if message.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
 
@@ -72,7 +75,7 @@ class Execution[Subject: Entity]:
                 elif isinstance(message, EntityMethodRequestReceived):
                     method = getattr(type(self.subject), message.method_name)
                 else:
-                    assert_never(message)
+                    assert_never(message)  # pragma: no cover
 
                 execution = greenlet(method)
                 self._initiators[execution] = message
@@ -91,6 +94,7 @@ class Execution[Subject: Entity]:
                     )
                 )
             elif isinstance(message, RESPONSE_RECEIVED):
+                # TODO: Reset execution state and raise custom error
                 if message.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
 
@@ -108,6 +112,7 @@ class Execution[Subject: Entity]:
                     )
                 )
             elif isinstance(message, ERROR_RECEIVED):
+                # TODO: Reset execution state and raise custom error
                 if message.offset < self._offset:
                     raise NotImplementedError("Unordered offsets")
 
@@ -139,11 +144,13 @@ class Execution[Subject: Entity]:
                 isinstance(message, REQUEST_SENT)  #
                 or isinstance(message, RESPONSE_SENT)
             ):
+                # TODO: Reset execution state and raise custom error
                 if message != output_messages.popleft():
                     raise NotImplementedError("Inconsistent execution context")
 
                 self._context.append(message)
             elif isinstance(message, EntityStateChanged):
+                # TODO: Reset execution state and raise custom error
                 if output_messages:
                     if message != output_messages.popleft():
                         raise NotImplementedError("Inconsistent execution context")
@@ -154,7 +161,7 @@ class Execution[Subject: Entity]:
                 self._context.append(message)
                 self._offset = message.offset + 1
             else:
-                assert_never(message)
+                assert_never(message)  # pragma: no cover
 
         self._context.extend(output_messages)
         return list(output_messages)
@@ -216,10 +223,7 @@ class Execution[Subject: Entity]:
             with Execution._intercept_interaction(self, initiator.offset):
                 interception = switch_to_execution()
         except Error as ex:
-            try:
-                error_arguments = self._errors[ex]
-            except KeyError:
-                raise ex
+            error_arguments = self._errors[ex]
 
             if isinstance(initiator, CreateEntityRequestReceived):
                 return [
@@ -246,7 +250,7 @@ class Execution[Subject: Entity]:
                     ),
                 ]
             else:
-                assert_never(initiator)
+                assert_never(initiator)  # pragma: no cover
 
         if not execution.dead:
             self._greenlets[interception.offset] = execution
@@ -277,7 +281,7 @@ class Execution[Subject: Entity]:
                 ),
             ]
         else:
-            assert_never(initiator)
+            assert_never(initiator)  # pragma: no cover
 
     @contextmanager
     def _intercept_interaction(
@@ -289,7 +293,7 @@ class Execution[Subject: Entity]:
             Execution._intercept_send_entity_request(self, trace_offset),
             Execution._intercept_send_service_request(self, trace_offset),
             Execution._intercept_entity_error(self),
-            # TODO: Protect entity state
+            # TODO: Protect entity state from modifying by another entity
         ):
             yield
 
@@ -338,10 +342,12 @@ class Execution[Subject: Entity]:
                 return original_getattribute(entity, name)
 
             if name.startswith("_"):
+                # TODO: Test this behavior
                 raise AttributeError("Entity state is private")
 
             original_method = getattr(type(entity), name)
             if not inspect.isfunction(original_method):
+                # TODO: Test this behavior
                 raise AttributeError("Entity state is private")
 
             @functools.wraps(original_method)
@@ -377,9 +383,11 @@ class Execution[Subject: Entity]:
             original_method = getattr(type(service), name)
 
             if name.startswith("_"):
+                # TODO: Test this behavior
                 raise AttributeError("Service state is private")
 
             if not inspect.isfunction(original_method):
+                # TODO: Test this behavior
                 raise AttributeError("Service state is private")
 
             @functools.wraps(original_method)

@@ -15,10 +15,10 @@ def test_init_is_not_implemented() -> None:
 
         class InvalidEntityType(Entity):  # noqa
             def __getstate__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
-            def __setstate__(self, state: None) -> None:
-                pass
+            def __setstate__(self, state: None) -> None:  # pragma: no cover
+                pass  # pragma: no cover
 
     assert str(exc_info.value) == "'__init__' method is not implemented"
 
@@ -28,10 +28,10 @@ def test_getstate_is_not_implemented() -> None:
 
         class InvalidEntityType(Entity):  # noqa
             def __init__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
             def __setstate__(self, state: None) -> None:
-                pass
+                pass  # pragma: no cover
 
     assert str(exc_info.value) == "'__getstate__' method is not implemented"
 
@@ -41,10 +41,10 @@ def test_setstate_is_not_implemented() -> None:
 
         class InvalidEntityType(Entity):  # noqa
             def __init__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
             def __getstate__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
     assert str(exc_info.value) == "'__setstate__' method is not implemented"
 
@@ -54,13 +54,13 @@ def test_missing_getstate_return_type_annotation() -> None:
 
         class InvalidEntityType(Entity):  # noqa
             def __init__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
             def __getstate__(self):  # type: ignore[no-untyped-def]
-                pass
+                pass  # pragma: no cover
 
             def __setstate__(self, state: None) -> None:
-                pass
+                pass  # pragma: no cover
 
     assert str(exc_info.value) == (
         "Missing return type annotation of '__getstate__' method"
@@ -72,13 +72,13 @@ def test_incompatible_setstate_parameter_type() -> None:
 
         class InvalidEntityType(Entity):  # noqa
             def __init__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
             def __getstate__(self) -> None:
-                pass
+                pass  # pragma: no cover
 
             def __setstate__(self, state: int) -> None:
-                pass
+                pass  # pragma: no cover
 
     assert str(exc_info.value) == (
         "Type of parameter 'state' of '__setstate__' method "
