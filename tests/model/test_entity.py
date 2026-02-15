@@ -10,7 +10,7 @@ def test_base_entity_cannot_be_instantiated() -> None:
     assert str(exc_info.value) == "Base 'Entity' class cannot be instantiated"
 
 
-def test_init_is_not_implemented() -> None:
+def test_init_must_be_implemented() -> None:
     with pytest.raises(TypeError) as exc_info:
 
         class InvalidEntityType(Entity):  # noqa
@@ -23,7 +23,7 @@ def test_init_is_not_implemented() -> None:
     assert str(exc_info.value) == "'__init__' method is not implemented"
 
 
-def test_getstate_is_not_implemented() -> None:
+def test_getstate_must_be_implemented() -> None:
     with pytest.raises(TypeError) as exc_info:
 
         class InvalidEntityType(Entity):  # noqa
@@ -36,7 +36,7 @@ def test_getstate_is_not_implemented() -> None:
     assert str(exc_info.value) == "'__getstate__' method is not implemented"
 
 
-def test_setstate_is_not_implemented() -> None:
+def test_setstate_must_be_implemented() -> None:
     with pytest.raises(TypeError) as exc_info:
 
         class InvalidEntityType(Entity):  # noqa
@@ -49,7 +49,7 @@ def test_setstate_is_not_implemented() -> None:
     assert str(exc_info.value) == "'__setstate__' method is not implemented"
 
 
-def test_missing_getstate_return_type_annotation() -> None:
+def test_getstate_return_type_annotation_required() -> None:
     with pytest.raises(TypeError) as exc_info:
 
         class InvalidEntityType(Entity):  # noqa
@@ -67,7 +67,7 @@ def test_missing_getstate_return_type_annotation() -> None:
     )
 
 
-def test_incompatible_setstate_parameter_type() -> None:
+def test_getstate_return_type_and_setstate_parameter_type_must_be_consistent() -> None:
     with pytest.raises(TypeError) as exc_info:
 
         class InvalidEntityType(Entity):  # noqa
