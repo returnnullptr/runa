@@ -9,6 +9,11 @@ from weakref import WeakKeyDictionary
 from greenlet import greenlet
 
 from runa.context import (
+    ERROR_RECEIVED,
+    REQUEST_RECEIVED,
+    REQUEST_SENT,
+    RESPONSE_RECEIVED,
+    RESPONSE_SENT,
     ContextMessage,
     CreateEntityErrorSent,
     CreateEntityRequestReceived,
@@ -23,11 +28,6 @@ from runa.context import (
     OutputMessage,
     ServiceMethodErrorReceived,
     ServiceMethodRequestSent,
-    RESPONSE_SENT,
-    REQUEST_SENT,
-    RESPONSE_RECEIVED,
-    ERROR_RECEIVED,
-    REQUEST_RECEIVED,
 )
 from runa.model import Entity, Error, Service
 
