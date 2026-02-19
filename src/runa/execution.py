@@ -311,7 +311,7 @@ class Execution[Subject: Entity]:
     ) -> Generator[None, None, None]:
         main_greenlet = greenlet.getcurrent()
 
-        def new(cls: type[Entity], *args: Any, **kwargs: Any) -> Entity:
+        def patched_new(cls: type[Entity], *args: Any, **kwargs: Any) -> Entity:
             entity: Entity = main_greenlet.switch(
                 CreateEntityRequestSent(
                     offset=self._next_offset(),
@@ -323,19 +323,19 @@ class Execution[Subject: Entity]:
             )
 
             # Temporary patch __init__ to avoid double initialization
-            def init(*_: Any, **__: Any) -> None:
-                setattr(cls, "__init__", original_init)
+            def temporary_patched_init(*_: Any, **__: Any) -> None:
+                setattr(cls, "__init__", not_patched_init)
 
-            original_init = getattr(cls, "__init__")
-            setattr(cls, "__init__", init)
+            not_patched_init = getattr(cls, "__init__")
+            setattr(cls, "__init__", temporary_patched_init)
             return entity
 
-        original_new = Entity.__new__
-        setattr(Entity, "__new__", new)
+        not_patched_new = Entity.__new__
+        setattr(Entity, "__new__", patched_new)
         try:
             yield
         finally:
-            setattr(Entity, "__new__", original_new)
+            setattr(Entity, "__new__", not_patched_new)
 
     @contextmanager
     def _intercept_send_entity_request(
@@ -344,9 +344,9 @@ class Execution[Subject: Entity]:
     ) -> Generator[None, None, None]:
         main_greenlet = greenlet.getcurrent()
 
-        def getattribute(entity: Entity, name: str) -> Any:
+        def patched_getattribute(entity: Entity, name: str) -> Any:
             if entity is self.subject:
-                return original_getattribute(entity, name)
+                return not_patched_getattribute(entity, name)
 
             if name.startswith("_"):
                 raise AttributeError("Entity state is private")
@@ -361,7 +361,7 @@ class Execution[Subject: Entity]:
                 raise AttributeError("Entity state is private")
 
             @functools.wraps(original_method)
-            def method(_: Any, /, *args: Any, **kwargs: Any) -> Any:
+            def patched_method(_: Any, /, *args: Any, **kwargs: Any) -> Any:
                 return main_greenlet.switch(
                     EntityMethodRequestSent(
                         offset=self._next_offset(),
@@ -373,29 +373,29 @@ class Execution[Subject: Entity]:
                     )
                 )
 
-            return functools.partial(method, entity)
+            return functools.partial(patched_method, entity)
 
-        original_getattribute = Entity.__getattribute__
-        setattr(Entity, "__getattribute__", getattribute)
+        not_patched_getattribute = Entity.__getattribute__
+        setattr(Entity, "__getattribute__", patched_getattribute)
         try:
             yield
         finally:
-            setattr(Entity, "__getattribute__", original_getattribute)
+            setattr(Entity, "__getattribute__", not_patched_getattribute)
 
     @contextmanager
     def _protect_entity_private_state(self) -> Generator[None, None, None]:
-        def set_attribute(entity: Entity, name: str, value: Any) -> None:
+        def patched_setattr(entity: Entity, name: str, value: Any) -> None:
             if entity is self.subject:
-                return original_set_attr(entity, name, value)
+                return not_patched_setattr(entity, name, value)
 
             raise AttributeError("Entity state is private")
 
-        original_set_attr = Entity.__setattr__
-        setattr(Entity, "__setattr__", set_attribute)
+        not_patched_setattr = Entity.__setattr__
+        setattr(Entity, "__setattr__", patched_setattr)
         try:
             yield
         finally:
-            setattr(Entity, "__setattr__", original_set_attr)
+            setattr(Entity, "__setattr__", not_patched_setattr)
 
     @contextmanager
     def _intercept_send_service_request(
@@ -404,7 +404,7 @@ class Execution[Subject: Entity]:
     ) -> Generator[None, None, None]:
         main_greenlet = greenlet.getcurrent()
 
-        def getattribute(service: Service, name: str) -> Any:
+        def patched_getattribute(service: Service, name: str) -> Any:
             original_method = getattr(type(service), name)
 
             if name.startswith("_"):
@@ -442,28 +442,28 @@ class Execution[Subject: Entity]:
         for attr_name, service_proxy in proxies:
             setattr(self.subject, attr_name, service_proxy)
 
-        original_getattribute = Service.__getattribute__
-        setattr(Service, "__getattribute__", getattribute)
+        not_patched_getattribute = Service.__getattribute__
+        setattr(Service, "__getattribute__", patched_getattribute)
         try:
             yield
         finally:
             for attr_name, _ in proxies:
                 delattr(self.subject, attr_name)
-            setattr(Entity, "__getattribute__", original_getattribute)
+            setattr(Entity, "__getattribute__", not_patched_getattribute)
 
     @contextmanager
     def _intercept_entity_error(self) -> Generator[None, None, None]:
-        def new(cls: type[Error], *args: Any, **kwargs: Any) -> Error:
-            error = original_new(cls, *args, **kwargs)
+        def patched_new(cls: type[Error], *args: Any, **kwargs: Any) -> Error:
+            error = not_patched_new(cls, *args, **kwargs)
             self._errors[error] = _ErrorArguments(cls, args, kwargs)
             return error
 
-        original_new = Error.__new__
-        setattr(Error, "__new__", new)
+        not_patched_new = Error.__new__
+        setattr(Error, "__new__", patched_new)
         try:
             yield
         finally:
-            setattr(Error, "__new__", original_new)
+            setattr(Error, "__new__", not_patched_new)
 
 
 class _ServiceProxy:
