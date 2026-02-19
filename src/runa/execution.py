@@ -347,7 +347,11 @@ class Execution[Subject: Entity]:
                 # TODO: Test this behavior
                 raise AttributeError("Entity state is private")
 
-            original_method = getattr(type(entity), name)
+            try:
+                original_method = getattr(type(entity), name)
+            except AttributeError:
+                raise AttributeError("Entity state is private")
+
             if not inspect.isfunction(original_method):
                 # TODO: Test this behavior
                 raise AttributeError("Entity state is private")
