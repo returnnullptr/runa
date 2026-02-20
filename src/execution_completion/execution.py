@@ -8,7 +8,7 @@ from weakref import WeakKeyDictionary
 
 from greenlet import greenlet
 
-from runa.context import (
+from execution_completion.context import (
     ERROR_RECEIVED,
     ERROR_SENT,
     REQUEST_RECEIVED,
@@ -30,7 +30,7 @@ from runa.context import (
     ServiceMethodErrorReceived,
     ServiceMethodRequestSent,
 )
-from runa.model import Entity, Error, Service
+from execution_completion.model import Entity, Error, Service
 
 
 class Execution[Subject: Entity]:

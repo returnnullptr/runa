@@ -1,7 +1,7 @@
 [project]
-name = "runa"
+name = "execution-completion"
 version = "0.1.0"
-description = "Domain logic isolation research"
+description = "Execution completion model"
 readme = "README.md"
 authors = [
   {name = "Yuriy Kehter", email = "yuriy.kehter@gmail.com"},

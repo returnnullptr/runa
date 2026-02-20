@@ -1,6 +1,4 @@
-# Runa
-
-Execution completion model
+# Execution completion
 
 ## Glossary
 

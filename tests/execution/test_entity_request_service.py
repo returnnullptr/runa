@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
-from runa import Execution
-from runa.context import (
+from execution_completion import Execution
+from execution_completion.context import (
     ContextMessage,
     CreateEntityErrorSent,
     CreateEntityRequestReceived,
@@ -15,7 +15,7 @@ from runa.context import (
     ServiceMethodRequestSent,
     ServiceMethodResponseReceived,
 )
-from runa.model import Entity, Error, Service
+from execution_completion.model import Entity, Error, Service
 
 
 class Sender(Entity):

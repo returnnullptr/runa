@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Union
 
-from runa.model import Entity, Error, Service
+from execution_completion.model import Entity, Error, Service
 
 
 @dataclass(kw_only=True, frozen=True)

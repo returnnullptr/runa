@@ -1,7 +1,7 @@
 import pytest
 
-from runa import Execution
-from runa.context import (
+from execution_completion import Execution
+from execution_completion.context import (
     ContextMessage,
     CreateEntityErrorReceived,
     CreateEntityErrorSent,
@@ -14,7 +14,7 @@ from runa.context import (
     EntityMethodResponseSent,
     EntityStateChanged,
 )
-from runa.model import Entity, Error
+from execution_completion.model import Entity, Error
 
 
 class Product(Entity):

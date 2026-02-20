@@ -1,8 +1,12 @@
 import pytest
 
-from runa import Execution
-from runa.context import ContextMessage, EntityMethodRequestReceived, EntityStateChanged
-from runa.model import Entity
+from execution_completion import Execution
+from execution_completion.context import (
+    ContextMessage,
+    EntityMethodRequestReceived,
+    EntityStateChanged,
+)
+from execution_completion.model import Entity
 
 
 class Counter(Entity):

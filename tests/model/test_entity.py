@@ -1,6 +1,6 @@
 import pytest
 
-from runa.model import Entity
+from execution_completion.model import Entity
 
 
 def test_base_entity_cannot_be_instantiated() -> None:
