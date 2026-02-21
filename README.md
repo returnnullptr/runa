@@ -2,124 +2,128 @@
 
 Execution completion is a way of executing domain model logic, inspired by chat completion.
 
-During inference, an LLM cannot cause side effects, but it can stop with the intention of calling a tool.
+Let's imagine, that the domain model cannot cause side effects, but it can pause execution with the intention of requesting another entity or external service.
 
-The same can be done for the domain model. Let's imagine, that the domain model cannot cause side effects, but it can pause execution with the intention of requesting another entity or external service.
-
-For example, the domain model consists of regular classes and synchronous methods:
+For example, the domain model consists of classes and synchronous methods:
 ```python
-@dataclass
-class SenderState:
-    receiver: Receiver
+from dataclasses import dataclass
 
-
-class Sender(Entity):
-    def __init__(self, receiver: Receiver) -> None:
-        self.receiver = receiver
-
-    def __getstate__(self) -> SenderState:
-        return SenderState(self.receiver)
-
-    def __setstate__(self, state: SenderState) -> None:
-        self.receiver = state.receiver
-
-    def send(self, message: str) -> str:
-        return self.receiver.receive(message)
+from execution_completion.model import Entity
 
 
 @dataclass
-class ReceiverState:
-    messages: list[str]
+class UserState:
+    name: str
 
 
-class Receiver(Entity):
-    def __init__(self) -> None:
-        self.messages: list[str] = []
+class User(Entity):
+    def __init__(self, name: str) -> None:
+        self.name = name
 
-    def __getstate__(self) -> ReceiverState:
-        return ReceiverState(self.messages)
+    def __getstate__(self) -> UserState:
+        return UserState(self.name)
 
-    def __setstate__(self, state: ReceiverState) -> None:
-        self.messages = state.messages
+    def __setstate__(self, state: UserState) -> None:
+        self.name = state.name
 
-    def receive(self, message: str) -> str:
-        self.messages.append(message)
-        return f"Received: {message!r}"
+    def write_article(self, text: str) -> Article:
+        return Article(self, text)
+
+    def write_comment(self, article: Article, text: str) -> Comment:
+        comment = Comment(self, text)
+        article.add_comment(comment)
+        return comment
+
+
+@dataclass
+class ArticleState:
+    author: User
+    text: str
+    comments: list[Comment]
+
+
+class Article(Entity):
+    def __init__(self, author: User, text: str) -> None:
+        self.author = author
+        self.text = text
+        self.comments: list[Comment] = []
+
+    def __getstate__(self) -> ArticleState:
+        return ArticleState(self.author, self.text, self.comments)
+
+    def __setstate__(self, state: ArticleState) -> None:
+        self.author = state.author
+        self.text = state.text
+        self.comments = state.comments
+
+    def add_comment(self, comment: Comment) -> None:
+        self.comments.append(comment)
+
+
+@dataclass
+class CommentState:
+    author: User
+    text: str
+
+
+class Comment(Entity):
+    def __init__(self, author: User, text: str) -> None:
+        self.author = author
+        self.text = text
+
+    def __getstate__(self) -> CommentState:
+        return CommentState(self.author, self.text)
+
+    def __setstate__(self, state: CommentState) -> None:
+        self.author = state.author
+        self.text = state.text
 ```
 
-The `Execution` accepts input messages and produces output messages, even if the execution is suspended.
+The `Execution.complete` method accepts input messages and produces output messages, even if the execution is suspended.
 
 ```python
-execution = Execution(Sender)
-receiver = Receiver()
+def test_entity_method_request_sent() -> None:
+    yura = User("Yura")
+    article = yura.write_article("Execution completion")
 
-input_messages: list[ContextMessage] = [
-    EntityStateChanged(
-        offset=2,
-        state=SenderState(receiver),
-    ),
-    EntityMethodRequestReceived(
-        offset=3,
-        method=Sender.send,
-        args=("Hello!",),
-        kwargs={},
-    ),
-]
+    execution = Execution(User)
+    comment = Comment(execution.subject, "Bullshit")
 
-output_messages = execution.complete(input_messages)
+    input_messages: list[ContextMessage] = [
+        EntityStateChanged(
+            offset=31337,
+            state=UserState("Guru"),
+        ),
+        EntityMethodRequestReceived(
+            offset=31338,
+            method=User.write_comment,
+            args=(article,),
+            kwargs={"text": "Bullshit"},
+        ),
+        CreateEntityRequestSent(
+            offset=31339,
+            trace_offset=31338,
+            entity_type=Comment,
+            args=(execution.subject, "Bullshit"),
+            kwargs={},
+        ),
+        CreateEntityResponseReceived(
+            offset=31340,
+            request_offset=31339,
+            response=comment,
+        ),
+    ]
 
-assert output_messages == [
-    EntityMethodRequestSent(
-        offset=4,
-        trace_offset=3,
-        receiver=receiver,
-        method=Receiver.receive,
-        args=("Hello!",),
-        kwargs={},
-    ),
-]
-```
+    output_messages = execution.complete(input_messages)
 
-The execution can be resumed when the result is available:
-
-```python
-input_messages: list[ContextMessage] = [
-    EntityStateChanged(
-        offset=2,
-        state=SenderState(receiver),
-    ),
-    EntityMethodRequestReceived(
-        offset=3,
-        method=Sender.send,
-        args=("Hello!",),
-        kwargs={},
-    ),
-    EntityMethodRequestSent(
-        offset=4,
-        trace_offset=3,
-        receiver=receiver,
-        method=Receiver.receive,
-        args=("Hello!",),
-        kwargs={},
-    ),
-    EntityMethodResponseReceived(
-        offset=5,
-        request_offset=4,
-        response=receiver.receive("Hello!"),
-    ),
-]
-
-output_messages = execution.complete(input_messages)
-
-assert output_messages == [
-    EntityMethodResponseSent(
-        offset=6,
-        request_offset=3,
-        response="Received: 'Hello!'",
-    ),
-    EntityStateChanged(
-        offset=7,
-        state=SenderState(receiver),
-    ),
-]
+    assert output_messages == [
+        EntityMethodRequestSent(
+            offset=31341,
+            trace_offset=31338,
+            receiver=article,
+            method=Article.add_comment,
+            args=(comment,),
+            kwargs={},
+        )
+    ]
 ```
